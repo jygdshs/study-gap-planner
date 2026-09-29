@@ -3,10 +3,14 @@
 // 계획서 2번(IPO 설계) "처리" 항목을 그대로 코드로 옮겼다.
 //  - 문제 풀이 유형: 정답률이 낮을수록 학습 점수가 낮다(=더 취약하다, 우선 학습 대상)
 //  - 개념 의미 유형: 기준 의미와 내가 쓴 의미가 얼마나 비슷한지(유사도)로 점수를 매긴다
-//  - 같은 조건이면 "마지막으로 학습한 지 얼마 안 됐을수록" 점수를 살짝 더 낮춘다
-//    (최근에 공부했는데도 점수가 낮다는 건 아직 안 익숙하다는 뜻으로 보고,
-//     한 번 더 복습하도록 우선순위를 올리기 위함)
-//  - 과목별 시험 날짜가 가까울수록 그 과목 단원들의 점수를 더 낮춘다
+//  - "점수(정답률/유사도)가 비슷한 단원들 사이에서만" 아래 두 가지로 동점자를 가린다
+//    ① 문제 풀이 유형은 문제를 더 많이 풀었는데도 점수가 비슷하면 그만큼 더 낮춘다
+//       (많이 풀어봤는데도 오답률이 그대로라면 더 뿌리 깊은 공백으로 본다)
+//    ② 마지막으로 학습한 지 얼마 안 됐을수록 점수를 살짝 더 낮춘다
+//       (최근에 공부했는데도 점수가 비슷하게 낮다는 건 아직 안 익숙하다는 뜻으로 보고
+//        한 번 더 복습하도록 우선순위를 올리기 위함)
+//    → 점수가 이미 확연히 다른 단원끼리는 이 두 보정이 적용되지 않는다(순수 동점자 처리이기 때문).
+//  - 과목별 시험 날짜가 가까울수록 그 과목 단원들의 점수를 낮춘다(동점 여부와 무관하게 항상 적용)
 //
 // 학습 점수는 0~100점이며, "점수가 낮을수록 우선적으로 학습해야 하는 단원/과목"이다.
 
@@ -116,17 +120,29 @@ export interface UnitStatus {
   finalScore: number; // 0~100, 낮을수록 우선 학습 대상
   metricLabel: string;
   metricValue: number;
+  tiedWithOthers: boolean; // 다른 단원과 점수(metricValue)가 비슷해 동점자 처리가 적용됐는지
   recencyPenalty: number;
+  volumePenalty: number;
   examPenalty: number;
   history: { date: string; score: number }[]; // 그래프용 (오래된 순)
   wrongReasonsHistory: { date: string; reasons: string[] }[];
 }
 
-function recencyPenalty(lastStudyISO: string, todayISOStr: string): number {
+// 이 이내로 점수(metricValue) 차이가 나면 "비슷하다"고 보고 동점자 처리를 적용한다.
+const TIE_SCORE_THRESHOLD = 5;
+
+function recencyTieBreak(lastStudyISO: string, todayISOStr: string): number {
   const daysSince = diffInDays(todayISOStr, lastStudyISO);
   if (daysSince < 0 || daysSince > 14) return 0;
-  // 최근에 공부했을수록(0일에 가까울수록) 최대 8점까지 감점 → 복습 우선순위를 살짝 높인다
+  // 최근에 공부했을수록(0일에 가까울수록) 최대 8점까지 감점
   return ((14 - daysSince) / 14) * 8;
+}
+
+// 문제 풀이 유형에서 "정답률은 비슷한데 문제를 더 많이 풀었다"를 반영하는 감점.
+// 문제 10개당 2점씩, 최대 5점까지 깎는다(25문제 이상이면 만점 감점).
+function volumeTieBreak(problemsTotal: number): number {
+  if (!problemsTotal || problemsTotal <= 0) return 0;
+  return Math.min(5, problemsTotal * 0.2);
 }
 
 function examPenalty(examDate: string | null, todayISOStr: string): number {
@@ -152,8 +168,19 @@ export function buildUnitStatuses(
     grouped.get(key)!.push(r);
   }
 
-  const statuses: UnitStatus[] = [];
+  // 1단계: 단원별로 가장 최근 기록의 기본 점수(정답률/유사도)만 먼저 계산해 둔다.
+  // "점수가 비슷한 단원끼리만" 동점자 처리를 적용해야 하므로, 비교 대상이 될
+  // 전체 기본 점수 목록이 먼저 필요하다.
+  interface Prepared {
+    subjectId: string;
+    subject: Subject;
+    unit: string;
+    sorted: StudyRecord[];
+    latest: StudyRecord;
+    baseScore: RecordScore;
+  }
 
+  const prepared: Prepared[] = [];
   for (const [key, groupRecords] of grouped) {
     const [subjectId, unit] = key.split("::");
     const subject = subjectMap.get(subjectId);
@@ -165,30 +192,50 @@ export function buildUnitStatuses(
       return a.created_at < b.created_at ? -1 : 1;
     });
     const latest = sorted[sorted.length - 1];
-    const latestScore = scoreOfRecord(latest);
+    prepared.push({ subjectId, subject, unit, sorted, latest, baseScore: scoreOfRecord(latest) });
+  }
 
-    const rPenalty = recencyPenalty(latest.study_date, todayISOStr);
-    const ePenalty = examPenalty(subject.exam_date, todayISOStr);
-    const finalScore = Math.max(
-      0,
-      Math.min(100, Math.round((latestScore.metricValue - rPenalty - ePenalty) * 10) / 10)
+  // 2단계: 다른 단원과 기본 점수가 TIE_SCORE_THRESHOLD 이내로 비슷한 단원에만
+  // 최근 학습일 감점(recency)과 문제 풀이량 감점(volume)을 적용한다.
+  const statuses: UnitStatus[] = prepared.map((p) => {
+    const tied = prepared.some(
+      (other) =>
+        other !== p &&
+        Math.abs(other.baseScore.metricValue - p.baseScore.metricValue) <= TIE_SCORE_THRESHOLD
     );
 
-    statuses.push({
-      subjectId,
-      subjectName: subject.name,
-      unit,
-      recordType: latest.record_type,
-      latestRecord: latest,
+    const rPenalty = tied ? recencyTieBreak(p.latest.study_date, todayISOStr) : 0;
+    const vPenalty =
+      tied && p.latest.record_type === "problem"
+        ? volumeTieBreak(p.latest.problems_total ?? 0)
+        : 0;
+    const ePenalty = examPenalty(p.subject.exam_date, todayISOStr);
+
+    const finalScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round((p.baseScore.metricValue - rPenalty - vPenalty - ePenalty) * 10) / 10
+      )
+    );
+
+    return {
+      subjectId: p.subjectId,
+      subjectName: p.subject.name,
+      unit: p.unit,
+      recordType: p.latest.record_type,
+      latestRecord: p.latest,
       finalScore,
-      metricLabel: latestScore.metricLabel,
-      metricValue: latestScore.metricValue,
+      metricLabel: p.baseScore.metricLabel,
+      metricValue: p.baseScore.metricValue,
+      tiedWithOthers: tied,
       recencyPenalty: Math.round(rPenalty * 10) / 10,
+      volumePenalty: Math.round(vPenalty * 10) / 10,
       examPenalty: Math.round(ePenalty * 10) / 10,
-      history: sorted.map((r) => ({ date: r.study_date, score: scoreOfRecord(r).metricValue })),
-      wrongReasonsHistory: sorted.map((r) => ({ date: r.study_date, reasons: r.wrong_reasons })),
-    });
-  }
+      history: p.sorted.map((r) => ({ date: r.study_date, score: scoreOfRecord(r).metricValue })),
+      wrongReasonsHistory: p.sorted.map((r) => ({ date: r.study_date, reasons: r.wrong_reasons })),
+    };
+  });
 
   return statuses.sort((a, b) => a.finalScore - b.finalScore);
 }
