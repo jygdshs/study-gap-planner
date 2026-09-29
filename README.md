@@ -1,13 +1,24 @@
-# 학습 공백 분석 시스템 — 입력 단계 (1~3차시)
+# 학습 공백 분석 시스템 (1~6차시)
 
-계획서의 IPO 설계 중 **입력(Input)** 부분만 구현한 Next.js + Supabase 프로젝트입니다.
+계획서의 IPO 설계를 그대로 구현한 Next.js + Supabase 프로젝트입니다.
+
+**입력(Input)**
 - 과목 / 단원 / 유형(문제 풀이·개념 의미) 입력
 - 문제 풀이: 문제 풀이 수, 맞은 문제 수, 틀린 문제 수, 틀린 이유
 - 개념 의미: 기준 의미, 채점할 의미, 틀린 이유
 - 과목별 시험 날짜, 요일별 공부 가능 시간
 - 입력한 내용은 모두 Supabase 데이터베이스에 저장됩니다.
 
-처리(학습 점수 계산)와 출력(개인별 학습 계획 화면)은 다음 차시에서 이어서 구현하면 됩니다.
+**처리(Process) — [`src/lib/scoring.ts`](src/lib/scoring.ts)**
+- 문제 풀이: 정답률(맞은 문제 수 ÷ 문제 풀이 수)을 기본 점수로 사용
+- 개념 의미: 기준 의미와 채점할 의미의 문자 2-gram 유사도(자카드 유사도)를 기본 점수로 사용
+- 최근에 학습했을수록 최대 8점, 시험이 가까울수록 최대 15점을 추가로 감점
+  → **학습 점수(0~100)가 낮을수록 우선적으로 공부해야 하는 단원/과목**
+- 과목 점수 = 그 과목에 속한 단원들의 학습 점수 평균
+
+**출력(Output)**
+- [`/plan`](src/app/plan/page.tsx) — 과목별 우선순위, 요일별(월~일) 개인 학습 계획표
+- [`/scores`](src/app/scores/page.tsx) — 작성 일시 × 과목/단원 학습 점수 표, 점수 변화 그래프, 틀린 이유 변화
 
 ## 0. 준비물 설치 (이 컴퓨터에는 아직 없어요)
 
@@ -48,7 +59,11 @@ npm install
 npm run dev
 ```
 
-브라우저에서 http://localhost:3000 접속 → `① 학습 결과 입력`, `② 요일별 공부 가능 시간` 화면 확인.
+브라우저에서 http://localhost:3000 접속 → `① 학습 결과 입력`, `② 요일별 공부 가능 시간`, `③ 요일별 학습 계획 보기`, `④ 학습 점수 보러 가기` 화면 확인.
+
+⚠️ Supabase 무료 플랜은 **7일간 접속이 없으면 프로젝트가 자동으로 일시 정지**됩니다. 오랜만에 열었는데
+"Failed to fetch" 오류가 뜨면 대시보드에서 프로젝트를 복구(Restore)한 뒤, SQL Editor에서
+`NOTIFY pgrst, 'reload schema';` 를 한 번 실행해 주세요.
 
 입력 후 Supabase 대시보드의 **Table Editor** 에서 `study_records`, `subjects`, `weekly_availability` 테이블에
 데이터가 실제로 쌓이는지 확인해 보세요. (계획서 8차시 "구동 확인"에 해당하는 과정입니다.)
@@ -85,20 +100,24 @@ CLI로 배포할 때도 `vercel env add` 로 위 두 환경 변수를 등록해�
 study-app/
 ├─ src/
 │  ├─ app/
-│  │  ├─ page.tsx            # 시작 화면 (두 입력 화면으로 이동)
-│  │  ├─ input/page.tsx      # 과목·단원·유형·문제풀이/개념의미 입력 화면
-│  │  └─ availability/page.tsx # 요일별 공부 가능 시간 입력 화면
+│  │  ├─ page.tsx              # 시작 화면 (네 화면으로 이동)
+│  │  ├─ input/page.tsx        # 과목·단원·유형·문제풀이/개념의미 입력 화면
+│  │  ├─ availability/page.tsx # 요일별 공부 가능 시간 입력 화면
+│  │  ├─ plan/page.tsx         # 출력: 과목 우선순위 + 요일별 개인 학습 계획
+│  │  └─ scores/page.tsx       # 출력: 학습 점수 표 + 변화 그래프 + 틀린 이유 변화
 │  ├─ components/
-│  │  ├─ SubjectPicker.tsx   # 과목 선택/추가 (시험 날짜 포함)
-│  │  └─ WrongReasonsInput.tsx # 틀린 이유 3~4개 태그 입력
-│  ├─ lib/supabaseClient.ts  # Supabase 클라이언트 생성
-│  └─ types/study.ts         # 입력 데이터 타입 정의
-└─ supabase/schema.sql       # 테이블 생성 SQL (Supabase SQL Editor에서 실행)
+│  │  ├─ SubjectPicker.tsx     # 과목 선택/추가 (시험 날짜 포함)
+│  │  ├─ WrongReasonsInput.tsx # 틀린 이유 3~4개 태그 입력
+│  │  └─ ScoreLineChart.tsx    # 학습 점수 변화 SVG 꺾은선 그래프
+│  ├─ lib/
+│  │  ├─ supabaseClient.ts     # Supabase 클라이언트 생성
+│  │  └─ scoring.ts            # 처리(Process): 학습 점수·우선순위·요일별 계획 계산
+│  └─ types/study.ts           # 입력/처리 데이터 타입 정의
+└─ supabase/schema.sql         # 테이블 생성 SQL (Supabase SQL Editor에서 실행)
 ```
 
-## 다음 차시에 이어서 만들 것 (처리·출력)
+## 다음 차시에 이어서 만들 것 (7~8차시)
 
-- `study_records`, `subjects`, `weekly_availability` 를 불러와 계획서 2번의 "처리(Process)" 규칙대로
-  과목별/단원별 학습 점수를 계산하는 함수 작성
-- 학습 점수를 바탕으로 요일별 개인 학습 계획을 만들어 `/plan` 같은 출력 화면에 표시
-- 새 학습 결과가 들어올 때마다 계획을 다시 계산하는 로직 추가
+- (7차시) 계획을 잘 지켰는지 체크하는 기능, 계획 변경 이력 관리
+- (8차시) 실제 데이터를 여러 개 넣어가며 입력→처리→출력 전체 흐름 통합 테스트
+- 마지막으로 GitHub → Vercel 배포 (README 4번 참고)

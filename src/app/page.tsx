@@ -37,11 +37,31 @@ export default function HomePage() {
             월~일 요일마다 하루에 공부할 수 있는 시간을 설정합니다.
           </span>
         </Link>
-      </nav>
 
-      <p className="text-center text-xs text-slate-400">
-        * 학습 점수 계산과 개인별 학습 계획(처리·출력 단계)은 다음 단계에서 구현합니다.
-      </p>
+        <Link
+          href="/plan"
+          className="flex flex-col gap-2 rounded-xl border border-brand-blue bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="text-base font-semibold text-brand-navy">
+            ③ 요일별 학습 계획 보기
+          </span>
+          <span className="text-sm text-slate-600">
+            학습 점수를 계산해 과목 우선순위와 요일별 개인 학습 계획을 보여줍니다.
+          </span>
+        </Link>
+
+        <Link
+          href="/scores"
+          className="flex flex-col gap-2 rounded-xl border border-brand-blue bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="text-base font-semibold text-brand-navy">
+            ④ 학습 점수 보러 가기
+          </span>
+          <span className="text-sm text-slate-600">
+            과목·단원별 학습 점수와 변화 그래프, 틀린 이유 변화를 확인합니다.
+          </span>
+        </Link>
+      </nav>
     </main>
   );
 }
