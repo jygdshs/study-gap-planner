@@ -17,11 +17,13 @@ import {
 } from "@/lib/scoring";
 import { diffPlanForSave, findPendingResultInputs, summarizeAdherence } from "@/lib/planTracking";
 import { buildSubjectColorMap } from "@/lib/palette";
+import { useAuth } from "@/lib/auth";
 
 // 이행률을 계산할 기간: 오늘 포함 최근 7일
 export const ADHERENCE_DAYS = 7;
 
 export function usePlanData() {
+  const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [availability, setAvailability] = useState<WeeklyAvailability[]>([]);
@@ -141,7 +143,10 @@ export function usePlanData() {
     if (upserts.length > 0) {
       const { error } = await supabase
         .from("plan_items")
-        .upsert(upserts, { onConflict: "plan_date,slot" });
+        .upsert(
+          upserts.map((u) => ({ ...u, user_id: user?.id })),
+          { onConflict: "user_id,plan_date,slot" }
+        );
       if (error) {
         setSaving(false);
         setMessage({ type: "error", text: `계획 저장 실패: ${error.message}` });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
+import { useAuth } from "@/lib/auth";
 import { DAY_LABELS } from "@/types/study";
 import { ArrowRightIcon, MinusIcon, PlusIcon } from "@/components/Icons";
 import { ConfigNotice, ErrorNotice, PageFrame, PageHeader } from "@/components/ui";
@@ -10,6 +11,7 @@ import { ConfigNotice, ErrorNotice, PageFrame, PageHeader } from "@/components/u
 const STEP = 0.5;
 
 export default function AvailabilityPage() {
+  const { user } = useAuth();
   const [hours, setHours] = useState<string[]>(Array(7).fill(""));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,14 +55,16 @@ export default function AvailabilityPage() {
     setSaving(true);
     setMessage(null);
 
+    // 8차시: 요일별 시간은 사용자마다 7행 → (user_id, day_of_week) 기준으로 덮어쓴다
     const rows = hours.map((h, idx) => ({
+      user_id: user?.id,
       day_of_week: idx,
       available_hours: h === "" ? 0 : Number(h),
     }));
 
     const { error } = await supabase
       .from("weekly_availability")
-      .upsert(rows, { onConflict: "day_of_week" });
+      .upsert(rows, { onConflict: "user_id,day_of_week" });
 
     setSaving(false);
 
