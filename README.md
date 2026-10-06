@@ -1,6 +1,8 @@
-# 학습 공백 분석 시스템 (1~6차시)
+# 학습 공백 분석 시스템
 
 계획서의 IPO 설계를 그대로 구현한 Next.js + Supabase 프로젝트입니다.
+
+**배포 주소: https://study-gap-planner.vercel.app** (GitHub `main`에 push하면 Vercel이 자동으로 다시 배포)
 
 **입력(Input)**
 - 과목 / 단원 / 유형(문제 풀이·개념 의미) 입력
