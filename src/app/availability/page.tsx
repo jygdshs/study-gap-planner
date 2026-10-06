@@ -115,13 +115,13 @@ export default function AvailabilityPage() {
                 {/* 막대: 하루 공부 가능 시간 */}
                 <div className="relative h-24 bg-ground" aria-hidden>
                   <div
-                    className="absolute inset-x-0 bottom-0 bg-shell transition-[height] duration-300 ease-out"
+                    className="absolute inset-x-0 bottom-0 bg-mark transition-[height] duration-300 ease-out"
                     style={{ height: `${(v / scaleMax) * 100}%` }}
                   />
                   {Array.from({ length: Math.floor(scaleMax) - 1 }, (_, i) => (
                     <span
                       key={i}
-                      className="absolute inset-x-0 h-px bg-sheet/70"
+                      className="absolute inset-x-0 h-px bg-sheet/60"
                       style={{ bottom: `${((i + 1) / scaleMax) * 100}%` }}
                     />
                   ))}
@@ -159,6 +159,14 @@ export default function AvailabilityPage() {
               </div>
             );
           })}
+          {/* 2칸·4칸 배치에서 남는 8번째 자리: 빈 괘선 대신 한 주 요약 */}
+          <div className="flex flex-col justify-center gap-1 bg-sheet p-4 lg:hidden">
+            <span className="text-[13px] font-semibold text-ink-muted">한 주 합계</span>
+            <span className="text-[28px] font-extrabold leading-none tracking-tight">{weekTotal}시간</span>
+            <span className="text-[13px] text-ink-muted">
+              하루 평균 {Math.round((weekTotal / 7) * 10) / 10}시간
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-rule p-5 sm:flex-row sm:items-center sm:justify-between">
