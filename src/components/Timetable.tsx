@@ -134,10 +134,10 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
               return (
                 <div
                   key={day.date}
-                  className={`flex flex-col items-center gap-1 py-2.5 ${isToday ? "bg-shell text-white" : "bg-sheet"}`}
+                  className={`flex flex-col items-center gap-1 py-2.5 ${isToday ? "bg-mark text-on-mark" : "bg-sheet"}`}
                 >
                   <span className="text-[19px] font-extrabold leading-none">{day.dayLabel}</span>
-                  <span className={`text-[12px] lg:text-[13px] ${isToday ? "font-semibold text-shell-text" : "text-ink-muted"}`}>
+                  <span className={`text-[12px] lg:text-[13px] ${isToday ? "font-semibold text-on-mark/75" : "text-ink-muted"}`}>
                     {isToday ? "오늘" : shortDate(day.date)}
                   </span>
                   {day.exams.map((ex) => (
@@ -195,7 +195,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           {todayIdx >= 0 && (
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 border-[3px] border-shell"
+              className="pointer-events-none absolute inset-y-0 border-[3px] border-mark"
               style={{
                 left: `calc(${LABEL_COL + 1}px + ${todayIdx} * ((100% - ${LABEL_COL + 2}px) / ${planDays.length}))`,
                 width: `calc((100% - ${LABEL_COL + 2}px) / ${planDays.length} + 1px)`,
@@ -213,16 +213,16 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
             <li
               key={day.date}
               className={`grid grid-cols-[52px_minmax(0,1fr)] gap-3 border-b border-rule px-4 py-3 last:border-b-0 ${
-                isToday ? "border-l-0 bg-[#F1F3F7] outline outline-[3px] -outline-offset-[3px] outline-shell" : ""
+                isToday ? "border-l-0 bg-today outline outline-[3px] -outline-offset-[3px] outline-mark" : ""
               }`}
             >
               <div
                 className={`flex flex-col items-center justify-center gap-0.5 self-stretch ${
-                  isToday ? "bg-shell text-white" : ""
+                  isToday ? "bg-mark text-on-mark" : ""
                 }`}
               >
                 <span className="text-[18px] font-extrabold leading-none">{day.dayLabel}</span>
-                <span className={`text-[12px] ${isToday ? "font-semibold text-shell-text" : "text-ink-muted"}`}>
+                <span className={`text-[12px] ${isToday ? "font-semibold text-on-mark/75" : "text-ink-muted"}`}>
                   {isToday ? "오늘" : shortDate(day.date)}
                 </span>
                 {day.exams.map((ex) => (

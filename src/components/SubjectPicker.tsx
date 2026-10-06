@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { buildSubjectColorMap, colorOf } from "@/lib/palette";
+import { buildSubjectColorMap, colorOf, subjectInk } from "@/lib/palette";
 import { PlusIcon } from "@/components/Icons";
 import type { Subject } from "@/types/study";
 
@@ -99,7 +99,7 @@ export default function SubjectPicker({ subjectId, onSubjectChange }: Props) {
                 style={
                   selected
                     ? { backgroundColor: color, borderColor: color, color: "#fff" }
-                    : { borderColor: color, color }
+                    : { borderColor: subjectInk(color), color: subjectInk(color) }
                 }
               >
                 <span className="text-[14px] font-bold leading-tight">{s.name}</span>
@@ -127,7 +127,7 @@ export default function SubjectPicker({ subjectId, onSubjectChange }: Props) {
       )}
 
       {showNewForm && (
-        <div className="grid gap-3 border border-dashed border-rule-strong bg-[#F7F8F8] p-4 sm:grid-cols-[minmax(0,1fr)_170px]">
+        <div className="grid gap-3 border border-dashed border-rule-strong bg-sheet-alt p-4 sm:grid-cols-[minmax(0,1fr)_170px]">
           <label className="flex flex-col gap-1.5">
             <span className="field-label">과목명</span>
             <input
@@ -169,7 +169,7 @@ export default function SubjectPicker({ subjectId, onSubjectChange }: Props) {
       {!loading && subjects.length === 0 && !showNewForm && (
         <p className="field-hint">아직 과목이 없어요. ‘새 과목’으로 먼저 추가해 주세요.</p>
       )}
-      {error && <p className="text-xs font-semibold text-gap-1">{error}</p>}
+      {error && <p className="text-xs font-semibold text-danger">{error}</p>}
     </div>
   );
 }

@@ -128,7 +128,7 @@ export default function ScoresPage() {
                         aria-selected={selected}
                         onClick={() => setSelectedKey(keyOf(u))}
                         className={`grid w-full grid-cols-[minmax(0,1fr)_40px] items-center gap-x-3 gap-y-2 px-5 py-3 text-left transition-colors ${
-                          selected ? "bg-[#F1F3F7] outline outline-2 -outline-offset-2 outline-shell" : "hover:bg-[#F7F8F8]"
+                          selected ? "bg-today outline outline-2 -outline-offset-2 outline-mark" : "hover:bg-sheet-alt"
                         }`}
                       >
                         <span className="flex min-w-0 items-center gap-2">
@@ -179,12 +179,12 @@ export default function ScoresPage() {
                             onClick={() => setSelectedKey(keyOf(c))}
                             aria-pressed={selected}
                             className={`flex w-full flex-col items-center gap-0.5 px-1 py-1 transition-colors ${
-                              selected ? "bg-shell text-white" : "hover:bg-ground"
+                              selected ? "bg-mark text-on-mark" : "hover:bg-ground"
                             }`}
                           >
                             <span className="flex items-center gap-1 text-[11px] font-semibold">
                               <SubjectChip color={colorOf(colors, c.subjectId)} className="h-2 w-2" />
-                              <span className={selected ? "text-shell-text" : "text-ink-muted"}>
+                              <span className={selected ? "text-on-mark/75" : "text-ink-muted"}>
                                 {c.subjectName}
                               </span>
                             </span>
@@ -293,7 +293,7 @@ function SelectedUnitPanel({ unit, color }: { unit: UnitStatus; color: string })
                 <dt className="text-[13px] font-semibold">{s.label}</dt>
                 <dd
                   className={`text-right text-[15px] font-bold ${
-                    s.kind === "minus" && s.value < 0 ? "text-gap-2" : ""
+                    s.kind === "minus" && s.value < 0 ? "text-danger" : ""
                   }`}
                 >
                   {s.kind === "base" ? s.value : s.value === 0 ? "0" : s.value}

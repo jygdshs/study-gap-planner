@@ -2,6 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * 색 토큰 (RGB 채널). tailwind.config.ts가 rgb(var(--c-…) / 알파)로 쓴다.
+ * 라이트: 교실 게시판에 붙은 인쇄 시간표 — 진남색 띠, 흰 시트, 회녹색 바탕.
+ * 다크:   밤의 시간표 — 더 깊은 남색 띠와 바탕, 짙은 남색 시트, 오늘·선택은 밝은 하늘보라.
+ * 기기 설정을 따르고, 상단 버튼으로 고른 값(html[data-theme])이 있으면 그걸 따른다.
+ */
+:root {
+  color-scheme: light;
+  --c-ground: 233 237 235;
+  --c-sheet: 255 255 255;
+  --c-sheet-alt: 247 248 248;
+  --c-sheet-muted: 244 246 245;
+  --c-today: 241 243 247;
+  --c-rule: 211 217 214;
+  --c-rule-strong: 169 179 175;
+  --c-ink: 24 35 58;
+  --c-ink-soft: 70 83 106;
+  --c-ink-muted: 95 107 126;
+  --c-shell: 24 35 58;
+  --c-shell-raised: 34 48 77;
+  --c-shell-line: 52 66 95;
+  --c-shell-text: 201 210 227;
+  --c-mark: 24 35 58;
+  --c-on-mark: 255 255 255;
+  --c-accent: 36 89 200;
+  --c-primary: 24 35 58;
+  --c-primary-hover: 34 48 77;
+  --c-on-primary: 255 255 255;
+  --c-danger: 194 65 44;
+  --c-ok: 18 122 85;
+  --c-warn: 154 91 0;
+  --notice-ok-bg: #e3f2eb;
+  --notice-ok-ink: #0b5a3e;
+  --notice-warn-bg: #fbf1df;
+  --notice-warn-ink: #6e4100;
+  --notice-err-bg: #fbe9e4;
+  --notice-err-ink: #9e2a1c;
+  --grid-line: rgba(24, 35, 58, 0.045);
+  /* 과목 색 글씨를 흰색 쪽으로 얼마나 끌어올릴지 (다크에서 대비 확보) */
+  --ink-lift: 0%;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-ground: 8 12 21;
+  --c-sheet: 21 29 46;
+  --c-sheet-alt: 27 36 57;
+  --c-sheet-muted: 14 20 34;
+  --c-today: 34 47 76;
+  --c-rule: 44 56 84;
+  --c-rule-strong: 70 85 116;
+  --c-ink: 230 235 244;
+  --c-ink-soft: 182 192 210;
+  --c-ink-muted: 140 152 174;
+  --c-shell: 16 25 46;
+  --c-shell-raised: 28 40 68;
+  --c-shell-line: 38 52 84;
+  --c-shell-text: 168 181 206;
+  --c-mark: 143 176 255;
+  --c-on-mark: 9 14 26;
+  --c-accent: 143 176 255;
+  --c-primary: 222 230 247;
+  --c-primary-hover: 242 245 252;
+  --c-on-primary: 11 16 28;
+  --c-danger: 255 138 115;
+  --c-ok: 111 211 168;
+  --c-warn: 242 194 107;
+  --notice-ok-bg: rgba(18, 122, 85, 0.18);
+  --notice-ok-ink: #8fe0bd;
+  --notice-warn-bg: rgba(154, 91, 0, 0.22);
+  --notice-warn-ink: #f2c26b;
+  --notice-err-bg: rgba(194, 65, 44, 0.2);
+  --notice-err-ink: #ffab98;
+  --grid-line: rgba(255, 255, 255, 0.03);
+  --ink-lift: 45%;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -13,24 +90,25 @@
     word-break: keep-all;
     /* 시간표 괘선 종이: 40px 간격의 아주 옅은 가로·세로 줄 */
     background-image:
-      linear-gradient(to right, rgba(24, 35, 58, 0.045) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(24, 35, 58, 0.045) 1px, transparent 1px);
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
     background-size: 40px 40px;
     background-position: center top;
+    transition: background-color 200ms ease;
   }
 
   ::selection {
-    background: #18233a;
-    color: #ffffff;
+    background: rgb(var(--c-mark));
+    color: rgb(var(--c-on-mark));
   }
 
   input,
   textarea {
-    caret-color: #2459c8;
+    caret-color: rgb(var(--c-accent));
   }
 
   :focus-visible {
-    outline: 2px solid #2459c8;
+    outline: 2px solid rgb(var(--c-accent));
     outline-offset: 2px;
   }
 
@@ -39,7 +117,7 @@
   }
 
   * {
-    scrollbar-color: #a9b3af transparent;
+    scrollbar-color: rgb(var(--c-rule-strong)) transparent;
     scrollbar-width: thin;
   }
 
@@ -76,7 +154,7 @@
   }
 
   .field {
-    @apply w-full rounded-sm border border-rule-strong bg-sheet px-3 py-2.5 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 hover:border-ink-muted focus:border-ink focus-visible:outline-none focus:ring-2 focus:ring-[#2459C8]/25 disabled:bg-ground disabled:text-ink-muted;
+    @apply w-full rounded-sm border border-rule-strong bg-sheet px-3 py-2.5 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 hover:border-ink-muted focus:border-ink focus-visible:outline-none focus:ring-2 focus:ring-accent/25 disabled:bg-ground disabled:text-ink-muted;
   }
 
   .btn {
@@ -84,12 +162,12 @@
   }
 
   .btn-primary {
-    @apply btn bg-shell text-white hover:bg-shell-raised disabled:bg-rule-strong disabled:text-white;
+    @apply btn bg-primary text-on-primary hover:bg-primary-hover disabled:bg-rule-strong disabled:text-on-primary;
   }
 
   /* 진남색 밴드 위에서 쓰는 밝은 버튼 */
   .btn-light {
-    @apply btn bg-white text-shell hover:bg-[#E6EBF5];
+    @apply btn bg-white text-[#18233A] hover:bg-[#E6EBF5];
   }
 
   .btn-quiet {
@@ -101,18 +179,23 @@
   }
 
   .notice-error {
-    @apply notice border-gap-2/40 bg-gap-5/40 text-gap-1;
+    @apply notice border-danger/40;
+    background: var(--notice-err-bg);
+    color: var(--notice-err-ink);
   }
 
   .notice-warn {
-    @apply notice border-warn/30 bg-[#FBF1DF] text-[#6E4100];
+    @apply notice border-warn/30;
+    background: var(--notice-warn-bg);
+    color: var(--notice-warn-ink);
   }
 
   .notice-ok {
-    @apply notice border-ok/30 bg-[#E3F2EB] text-[#0B5A3E];
+    @apply notice border-ok/30;
+    background: var(--notice-ok-bg);
+    color: var(--notice-ok-ink);
   }
 }
-
 /* 시그니처: 시간표 칸이 채워지거나 완료 도장이 찍히는 한 번의 짧은 전환 */
 @keyframes cell-fill {
   from {

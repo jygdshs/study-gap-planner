@@ -27,7 +27,7 @@ export default function PriorityList({
                 <SubjectChip color={color} />
                 <span className="truncate text-[16px] font-bold">{sp.subject.name}</span>
                 {dday !== null && dday >= 0 && (
-                  <span className="shrink-0 text-[13px] font-semibold text-gap-2">
+                  <span className="shrink-0 text-[13px] font-semibold text-danger">
                     시험 D-{dday === 0 ? "DAY" : dday}
                   </span>
                 )}

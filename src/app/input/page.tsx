@@ -195,10 +195,10 @@ export default function InputPage() {
                       onClick={() => resetTypeFields(opt.value)}
                       className={`flex flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors ${
                         i === 1 ? "border-l border-rule-strong" : ""
-                      } ${active ? "bg-shell text-white" : "bg-sheet text-ink hover:bg-ground"}`}
+                      } ${active ? "bg-mark text-on-mark" : "bg-sheet text-ink hover:bg-ground"}`}
                     >
                       <span className="text-sm font-bold">{opt.label}</span>
-                      <span className={`text-[11px] ${active ? "text-shell-text" : "text-ink-muted"}`}>
+                      <span className={`text-[11px] ${active ? "text-on-mark/75" : "text-ink-muted"}`}>
                         {opt.hint}
                       </span>
                     </button>

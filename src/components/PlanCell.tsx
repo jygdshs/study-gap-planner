@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckIcon } from "@/components/Icons";
+import { completedFill, subjectInk } from "@/lib/palette";
 
 // 시간표 한 칸. 계획 블록 = 과목 색 단색 블록.
 //  - saved: 저장된 계획. 오늘까지의 칸은 칸 전체를 눌러 완료 체크한다.
@@ -49,7 +50,8 @@ export default function PlanCell(props: Props) {
         className={`${fill} flex h-full ${minH} items-center justify-center text-[13px] font-semibold text-ink-muted`}
         style={{
           ...motion,
-          backgroundImage: "repeating-linear-gradient(135deg, #E9EDEB 0 6px, #FFFFFF 6px 12px)",
+          backgroundImage:
+            "repeating-linear-gradient(135deg, rgb(var(--c-ground)) 0 6px, rgb(var(--c-sheet)) 6px 12px)",
         }}
       >
         <span className="bg-sheet px-2 py-0.5">쉬는 날</span>
@@ -65,7 +67,7 @@ export default function PlanCell(props: Props) {
     return (
       <div
         className={`${fill} flex h-full ${minH} flex-col justify-between gap-1 border border-dashed bg-sheet p-2`}
-        style={{ ...motion, borderColor: props.color, color: props.color }}
+        style={{ ...motion, borderColor: subjectInk(props.color), color: subjectInk(props.color) }}
       >
         <span className={`${subjectText} font-semibold leading-none`}>{props.subjectName}</span>
         <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
@@ -93,8 +95,8 @@ export default function PlanCell(props: Props) {
           aria-hidden
           className={`stamp-in absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center border-2`}
           style={{
-            borderColor: color,
-            color,
+            borderColor: subjectInk(color),
+            color: subjectInk(color),
             // 처음부터 완료였던 칸은 칸이 다 채워진 뒤에 도장이 찍힌다
             animationDelay: initiallyCompleted && fillOnMount ? `${delayOnMount + 380}ms` : undefined,
           }}
@@ -113,7 +115,7 @@ export default function PlanCell(props: Props) {
   );
 
   const style = completed
-    ? { ...motion, backgroundColor: `color-mix(in srgb, ${color} 14%, white)`, color }
+    ? { ...motion, backgroundColor: completedFill(color), color: subjectInk(color) }
     : { ...motion, backgroundColor: color };
   const base = `${fill} relative flex h-full ${minH} flex-col justify-between gap-1 p-2 text-left transition-colors duration-300`;
 
@@ -127,7 +129,7 @@ export default function PlanCell(props: Props) {
 
   return (
     <label
-      className={`${base} group cursor-pointer has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#2459C8]`}
+      className={`${base} group cursor-pointer has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent`}
       style={style}
       title={completed ? "완료 체크 취소" : "계획을 지켰으면 눌러서 체크"}
     >

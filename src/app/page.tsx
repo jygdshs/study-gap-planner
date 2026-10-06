@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePlanData } from "@/lib/usePlanData";
-import { colorOf } from "@/lib/palette";
+import { colorOf, completedFill, subjectInk } from "@/lib/palette";
 import { DAY_LABELS_FULL, dayOfWeekMonFirst } from "@/lib/scoring";
 import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
@@ -169,7 +169,7 @@ export default function HomePage() {
               <h2 id="week-title" className="sheet-title">
                 이번 주 시간표
               </h2>
-              <Link href="/plan" className="text-[13px] font-semibold text-[#2459C8] hover:underline">
+              <Link href="/plan" className="text-[13px] font-semibold text-accent hover:underline">
                 크게 보기
               </Link>
             </div>
@@ -182,12 +182,12 @@ export default function HomePage() {
                       key={day.date}
                       className={`flex flex-col gap-1 p-1.5 ${
                         isToday
-                          ? "bg-[#F1F3F7] outline outline-[3px] -outline-offset-[3px] outline-shell"
+                          ? "bg-today outline outline-[3px] -outline-offset-[3px] outline-mark"
                           : "bg-sheet"
                       }`}
                     >
                       <span
-                        className={`py-0.5 text-center text-[14px] font-extrabold ${isToday ? "bg-shell text-white" : ""}`}
+                        className={`py-0.5 text-center text-[14px] font-extrabold ${isToday ? "bg-mark text-on-mark" : ""}`}
                       >
                         {day.dayLabel}
                       </span>
@@ -197,7 +197,7 @@ export default function HomePage() {
                           title="쉬는 날"
                           style={{
                             backgroundImage:
-                              "repeating-linear-gradient(135deg, #E9EDEB 0 5px, #FFFFFF 5px 10px)",
+                              "repeating-linear-gradient(135deg, rgb(var(--c-ground)) 0 5px, rgb(var(--c-sheet)) 5px 10px)",
                           }}
                         />
                       ) : (
@@ -218,12 +218,12 @@ export default function HomePage() {
                                 saved
                                   ? saved.completed
                                     ? {
-                                        backgroundColor: `color-mix(in srgb, ${c} 14%, white)`,
-                                        color: c,
+                                        backgroundColor: completedFill(c),
+                                        color: subjectInk(c),
                                         textDecoration: "line-through",
                                       }
                                     : { backgroundColor: c, color: "#fff" }
-                                  : { boxShadow: `inset 0 0 0 1px ${c}`, color: c }
+                                  : { boxShadow: `inset 0 0 0 1px ${subjectInk(c)}`, color: subjectInk(c) }
                               }
                             >
                               <span className="line-clamp-2 break-all">{unit}</span>
@@ -244,7 +244,7 @@ export default function HomePage() {
               <h2 id="top-title" className="sheet-title">
                 우선순위
               </h2>
-              <Link href="/scores" className="text-[13px] font-semibold text-[#2459C8] hover:underline">
+              <Link href="/scores" className="text-[13px] font-semibold text-accent hover:underline">
                 점수 근거 보기
               </Link>
             </div>

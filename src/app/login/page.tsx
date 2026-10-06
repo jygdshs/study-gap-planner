@@ -104,7 +104,7 @@ export default function LoginPage() {
                 {label}
                 <span
                   aria-hidden
-                  className={`absolute inset-x-0 bottom-[-1px] h-[3px] bg-shell transition-transform duration-200 ${
+                  className={`absolute inset-x-0 bottom-[-1px] h-[3px] bg-mark transition-transform duration-200 ${
                     active ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
@@ -170,7 +170,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
-              className="font-semibold text-[#2459C8] hover:underline"
+              className="font-semibold text-accent hover:underline"
             >
               {mode === "signin" ? "회원가입" : "로그인"}
             </button>

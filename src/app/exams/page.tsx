@@ -170,7 +170,7 @@ export default function ExamsPage() {
                       </span>
                       <span
                         className={`col-span-2 text-[13px] font-semibold sm:col-span-1 sm:text-right ${
-                          dday === null ? "text-ink-muted" : dday < 0 ? "text-ink-muted" : "text-gap-2"
+                          dday === null ? "text-ink-muted" : dday < 0 ? "text-ink-muted" : "text-danger"
                         }`}
                       >
                         {dday === null
@@ -188,7 +188,7 @@ export default function ExamsPage() {
             )}
 
             {/* 과목 추가 */}
-            <div className="grid gap-2 border-b border-rule bg-[#F7F8F8] px-5 py-4 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+            <div className="grid gap-2 border-b border-rule bg-sheet-alt px-5 py-4 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
               <input
                 type="text"
                 value={newName}
@@ -265,10 +265,10 @@ export default function ExamsPage() {
                       key={date}
                       className={`flex min-h-[64px] flex-col gap-1 p-1.5 ${
                         isToday
-                          ? "bg-[#F1F3F7] outline outline-[3px] -outline-offset-[3px] outline-shell"
+                          ? "bg-today outline outline-[3px] -outline-offset-[3px] outline-mark"
                           : inPlan
                             ? "bg-sheet"
-                            : "bg-[#F4F6F5]"
+                            : "bg-sheet-muted"
                       }`}
                     >
                       <span
@@ -278,7 +278,7 @@ export default function ExamsPage() {
                       >
                         {isToday ? "오늘" : shortDate(date)}
                       </span>
-                      {inPlan && !exams.length && <span className="mt-auto h-1 bg-shell/80" aria-hidden />}
+                      {inPlan && !exams.length && <span className="mt-auto h-1 bg-mark/70" aria-hidden />}
                       {exams.map((s) => (
                         <span
                           key={s.id}

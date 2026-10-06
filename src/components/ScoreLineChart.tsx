@@ -1,6 +1,6 @@
 "use client";
 
-import { scoreColor } from "@/lib/palette";
+import { scoreColor, subjectInk } from "@/lib/palette";
 
 interface Point {
   date: string; // YYYY-MM-DD
@@ -14,7 +14,7 @@ interface Point {
  */
 export default function ScoreLineChart({
   points,
-  color = "#18233A",
+  color = "#5F6B7E",
   height = 200,
 }: {
   points: Point[];
@@ -57,16 +57,16 @@ export default function ScoreLineChart({
             x2={width - padR}
             y1={toY(g)}
             y2={toY(g)}
-            stroke={g === 0 ? "#A9B3AF" : "#E3E7E5"}
+            style={{ stroke: g === 0 ? "rgb(var(--c-rule-strong))" : "rgb(var(--c-rule))" }}
             strokeWidth={1}
           />
-          <text x={padL - 8} y={toY(g) + 4} fontSize={11} textAnchor="end" fill="#5F6B7E">
+          <text x={padL - 8} y={toY(g) + 4} fontSize={11} textAnchor="end" style={{ fill: "rgb(var(--c-ink-muted))" }}>
             {g}
           </text>
         </g>
       ))}
 
-      <path d={pathD} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />
+      <path d={pathD} fill="none" strokeWidth={2.5} strokeLinejoin="round" style={{ stroke: subjectInk(color) }} />
 
       {points.map((p, i) => (
         <g key={`${p.date}-${i}`}>
@@ -79,7 +79,7 @@ export default function ScoreLineChart({
             stroke={color}
             strokeWidth={2}
           />
-          <text x={toX(i)} y={height - 9} fontSize={11} textAnchor="middle" fill="#5F6B7E">
+          <text x={toX(i)} y={height - 9} fontSize={11} textAnchor="middle" style={{ fill: "rgb(var(--c-ink-muted))" }}>
             {`${Number(p.date.slice(5, 7))}.${Number(p.date.slice(8, 10))}`}
           </text>
         </g>
@@ -91,7 +91,7 @@ export default function ScoreLineChart({
         fontSize={13}
         fontWeight={800}
         textAnchor={points.length > 1 ? "end" : "middle"}
-        fill="#18233A"
+        style={{ fill: "rgb(var(--c-ink))" }}
       >
         {last.score}
       </text>

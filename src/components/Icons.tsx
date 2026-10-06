@@ -45,6 +45,22 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+export function SunIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 8.5a3.5 3.5 0 110 7 3.5 3.5 0 010-7zM12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
+    </Svg>
+  );
+}
+
+export function MoonIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" />
+    </Svg>
+  );
+}
+
 export function MinusIcon(props: IconProps) {
   return (
     <Svg {...props}>

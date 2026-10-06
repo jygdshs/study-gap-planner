@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { TimetableMark } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/input", label: "결과 입력" },
@@ -56,7 +57,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <TimetableMark className="h-5 w-5" />
               <span className="text-[15px] font-bold tracking-tight">학습 공백 분석</span>
             </Link>
-            <div className="sm:hidden">{account}</div>
+            <div className="flex items-center gap-3 sm:hidden">
+              {account}
+              <ThemeToggle />
+            </div>
           </div>
 
           {session && (
@@ -90,6 +94,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="hidden items-center sm:flex">{account}</div>
             </div>
           )}
+          <div className="hidden items-center pl-4 sm:flex">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

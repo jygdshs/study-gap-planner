@@ -31,6 +31,19 @@ export function colorOf(map: Map<string, string>, subjectId: string): string {
   return map.get(subjectId) ?? FALLBACK_COLOR;
 }
 
+/**
+ * 과목 색으로 쓰는 '글씨·테두리' 색. 다크 모드에서는 --ink-lift(45%)만큼 흰색 쪽으로 끌어올려
+ * 짙은 바탕 위에서도 읽히게 한다. (과목 색 단색 블록 자체는 두 모드에서 같다)
+ */
+export function subjectInk(color: string): string {
+  return `color-mix(in srgb, ${color} calc(100% - var(--ink-lift)), white)`;
+}
+
+/** 완료한 칸의 옅은 바탕: 과목 색 14% + 시트 색 */
+export function completedFill(color: string): string {
+  return `color-mix(in srgb, ${color} 14%, rgb(var(--c-sheet)))`;
+}
+
 // tailwind.config.ts의 gap 1~5와 같은 값
 export const GAP_RAMP = ["#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8"] as const;
 

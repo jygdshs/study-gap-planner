@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { addDaysISO, dayOfWeekMonFirst, DAY_LABELS_FULL } from "@/lib/scoring";
-import { colorOf } from "@/lib/palette";
+import { colorOf, subjectInk } from "@/lib/palette";
 import { ADHERENCE_DAYS, usePlanData } from "@/lib/usePlanData";
 import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
@@ -110,7 +110,7 @@ export default function PlanPage() {
                   </h2>
                   <p className="text-[13px] text-ink-soft">
                     {periodNote}{" "}
-                    <Link href="/exams" className="font-semibold text-[#2459C8] hover:underline">
+                    <Link href="/exams" className="font-semibold text-accent hover:underline">
                       시험 일정 {horizon.lastExamDate ? "바꾸기" : "넣기"}
                     </Link>
                   </p>
@@ -177,11 +177,11 @@ export default function PlanPage() {
                         aria-selected={active}
                         onClick={() => setWeekIdx(i)}
                         className={`flex shrink-0 flex-col items-start border px-3 py-1.5 text-left transition-colors ${
-                          active ? "border-shell bg-shell text-white" : "border-rule-strong bg-sheet hover:border-ink"
+                          active ? "border-mark bg-mark text-on-mark" : "border-rule-strong bg-sheet hover:border-ink"
                         }`}
                       >
                         <span className="text-[13px] font-bold">{i + 1}주차</span>
-                        <span className={`text-[12px] ${active ? "text-shell-text" : "text-ink-muted"}`}>
+                        <span className={`text-[12px] ${active ? "text-on-mark/75" : "text-ink-muted"}`}>
                           {shortDate(w[0].date)} – {shortDate(w[w.length - 1].date)}
                           {examCount > 0 && ` · 시험 ${examCount}`}
                         </span>
@@ -287,7 +287,7 @@ export default function PlanPage() {
                               it && c
                                 ? it.completed
                                   ? { backgroundColor: c, color: "#fff" }
-                                  : { boxShadow: `inset 0 0 0 2px ${c}` }
+                                  : { boxShadow: `inset 0 0 0 2px ${subjectInk(c)}` }
                                 : undefined
                             }
                           >
@@ -335,7 +335,7 @@ export default function PlanPage() {
                               {shortDate(it.plan_date)} 완료
                             </span>
                           </span>
-                          <span className="flex items-center gap-1 text-[13px] font-semibold text-[#2459C8] group-hover:underline">
+                          <span className="flex items-center gap-1 text-[13px] font-semibold text-accent group-hover:underline">
                             결과 입력 <ArrowRightIcon className="h-3.5 w-3.5" />
                           </span>
                         </Link>
