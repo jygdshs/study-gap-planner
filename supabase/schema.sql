@@ -61,3 +61,27 @@ create policy "anon full access" on study_records for all using (true) with chec
 
 drop policy if exists "anon full access" on weekly_availability;
 create policy "anon full access" on weekly_availability for all using (true) with check (true);
+
+-- 4) [7차시] 저장된 날짜별 학습 계획 + 이행 여부 체크
+--    하루에 최대 2칸(slot 0, 1)의 계획을 저장하고, 실제로 지켰는지 completed로 체크한다.
+create table if not exists plan_items (
+  id uuid primary key default gen_random_uuid(),
+  plan_date date not null,
+  slot int not null check (slot between 0 and 1),
+  subject_id uuid not null references subjects(id) on delete cascade,
+  unit text not null,
+  completed boolean not null default false,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (plan_date, slot)
+);
+
+create index if not exists plan_items_plan_date_idx on plan_items (plan_date);
+
+alter table plan_items enable row level security;
+
+drop policy if exists "anon full access" on plan_items;
+create policy "anon full access" on plan_items for all using (true) with check (true);
+
+-- 새 테이블을 API(PostgREST)가 바로 인식하도록 스키마 캐시를 갱신한다.
+notify pgrst, 'reload schema';

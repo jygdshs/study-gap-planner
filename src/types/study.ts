@@ -40,3 +40,15 @@ export interface WeeklyAvailability {
   available_hours: number;
   updated_at: string;
 }
+
+// 7차시: 저장된 학습 계획 1칸 + 이행 여부
+export interface PlanItem {
+  id: string;
+  plan_date: string; // YYYY-MM-DD
+  slot: number; // 0 또는 1 (하루 최대 2칸)
+  subject_id: string;
+  unit: string;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+}

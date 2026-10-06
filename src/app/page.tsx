@@ -10,7 +10,7 @@ export default function HomePage() {
       </header>
 
       <p className="text-center text-sm text-slate-600">
-        학번 2511 정영광 · 정보과학 프로젝트 (1단계: 입력 화면)
+        학번 2511 정영광 · 정보과학 프로젝트
       </p>
 
       <nav className="grid gap-4 sm:grid-cols-2">
@@ -46,7 +46,7 @@ export default function HomePage() {
             ③ 요일별 학습 계획 보기
           </span>
           <span className="text-sm text-slate-600">
-            학습 점수를 계산해 과목 우선순위와 요일별 개인 학습 계획을 보여줍니다.
+            과목 우선순위와 요일별 학습 계획을 보고, 계획을 지켰는지 체크합니다.
           </span>
         </Link>
 

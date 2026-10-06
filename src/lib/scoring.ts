@@ -281,7 +281,7 @@ export interface PlanDay {
   date: string;
   dayLabel: string;
   availableHours: number;
-  items: { subjectName: string; unit: string; score: number }[]; // 하루 최대 2개 추천
+  items: { subjectId: string; subjectName: string; unit: string; score: number }[]; // 하루 최대 2개 추천
 }
 
 export function buildStudyPlan(
@@ -308,12 +308,18 @@ export function buildStudyPlan(
     const items: PlanDay["items"] = [];
     if (availableHours > 0 && topN.length > 0) {
       const first = topN[i % topN.length];
-      items.push({ subjectName: first.subjectName, unit: first.unit, score: first.finalScore });
+      items.push({
+        subjectId: first.subjectId,
+        subjectName: first.subjectName,
+        unit: first.unit,
+        score: first.finalScore,
+      });
 
       if (topN.length > 1) {
         const second = topN[(i + 1) % topN.length];
         if (second.unit !== first.unit || second.subjectName !== first.subjectName) {
           items.push({
+            subjectId: second.subjectId,
             subjectName: second.subjectName,
             unit: second.unit,
             score: second.finalScore,

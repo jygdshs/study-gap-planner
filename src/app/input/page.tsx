@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import { todayISO } from "@/lib/scoring";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
 import type { RecordType } from "@/types/study";
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// toISOString()은 UTC 기준이라 한국 시간 오전 9시 전에는 '어제' 날짜가 나온다.
+// 그래서 로컬 날짜를 쓰는 scoring.ts의 todayISO를 사용한다.
 
 export default function InputPage() {
   const [subjectId, setSubjectId] = useState("");
@@ -28,6 +30,15 @@ export default function InputPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  // 7차시: 학습 계획 화면의 "결과 입력 →" 링크로 들어오면 과목·단원을 미리 채워 둔다
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const subject = params.get("subject");
+    const presetUnit = params.get("unit");
+    if (subject) setSubjectId(subject);
+    if (presetUnit) setUnit(presetUnit);
+  }, []);
 
   const resetTypeFields = (type: RecordType) => {
     setRecordType(type);

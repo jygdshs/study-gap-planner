@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured, describeLoadError } from "@/lib/supabaseClient";
 import type { StudyRecord, Subject } from "@/types/study";
 import { buildUnitStatuses, scoreOfRecord, type UnitStatus } from "@/lib/scoring";
 import ScoreLineChart from "@/components/ScoreLineChart";
@@ -26,7 +26,7 @@ export default function ScoresPage() {
 
       const firstError = subjectsRes.error ?? recordsRes.error;
       if (firstError) {
-        setError(firstError.message);
+        setError(describeLoadError(firstError.message));
         setLoading(false);
         return;
       }
@@ -99,7 +99,7 @@ export default function ScoresPage() {
 
       {loading ? (
         <p className="text-sm text-slate-400">학습 점수를 불러오는 중...</p>
-      ) : columns.length === 0 ? (
+      ) : error ? null : columns.length === 0 ? (
         <p className="rounded-xl bg-white p-5 text-sm text-slate-500 shadow-sm">
           아직 학습 기록이 없어요.{" "}
           <Link href="/input" className="text-brand-navy underline underline-offset-2">

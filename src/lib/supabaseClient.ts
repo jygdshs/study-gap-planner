@@ -15,6 +15,17 @@ if (!isSupabaseConfigured) {
   );
 }
 
+/**
+ * 8차시 통합 테스트에서 발견: Supabase 무료 프로젝트가 7일 미접속으로 일시 정지되면
+ * 주소 자체를 찾지 못해 "Failed to fetch"만 떠서 원인을 알기 어렵다. 해결 방법을 함께 안내한다.
+ */
+export function describeLoadError(message: string): string {
+  if (/failed to fetch|network/i.test(message)) {
+    return `${message} — Supabase 프로젝트가 일시 정지됐을 수 있어요. 대시보드에서 프로젝트를 복구(Restore)한 뒤 다시 시도해 주세요.`;
+  }
+  return message;
+}
+
 export const supabase = createClient(
   supabaseUrl || "https://placeholder.supabase.co",
   supabaseAnonKey || "public-anon-key-placeholder"
