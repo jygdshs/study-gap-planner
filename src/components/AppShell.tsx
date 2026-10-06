@@ -35,12 +35,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const account = session && (
     <div className="flex items-center gap-3 text-[13px]">
-      <span className="max-w-[180px] truncate text-shell-text" title={user?.email ?? ""}>
+      <span className="hidden max-w-[180px] truncate text-shell-text lg:inline" title={user?.email ?? ""}>
         {user?.email}
       </span>
       <button
         type="button"
         onClick={signOut}
+        title={user?.email ? `${user.email} 로그아웃` : "로그아웃"}
         className="border border-white/25 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/10"
       >
         로그아웃
@@ -55,7 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-0 sm:py-0">
             <Link href="/" className="flex items-center gap-2.5" aria-label="학습 공백 분석 — 처음 화면">
               <TimetableMark className="h-5 w-5" />
-              <span className="text-[15px] font-bold tracking-tight">학습 공백 분석</span>
+              <span className="whitespace-nowrap text-[15px] font-bold tracking-tight">학습 공백 분석</span>
             </Link>
             <div className="flex items-center gap-3 sm:hidden">
               {account}

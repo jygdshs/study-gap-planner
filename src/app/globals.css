@@ -162,7 +162,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-primary text-on-primary hover:bg-primary-hover disabled:bg-rule-strong disabled:text-on-primary;
+    @apply btn bg-primary text-on-primary hover:bg-primary-hover disabled:bg-rule disabled:text-ink-muted;
   }
 
   /* 진남색 밴드 위에서 쓰는 밝은 버튼 */
