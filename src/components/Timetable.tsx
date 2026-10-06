@@ -26,8 +26,14 @@ export default function Timetable({ data }: { data: PlanData }) {
   const maxHours = Math.max(1, ...planDays.map((d) => d.availableHours));
   const todayIdx = planDays.findIndex((d) => d.date === today);
 
+  // 처음 들어올 때: 요일(열) 순서대로, 같은 요일 안에서는 교시 순서대로 시간차를 두고 채운다.
+  // 그 뒤 갱신으로 바뀐 칸은 시간차 없이 바로 채워진다.
+  const delayFor = (dayIdx: number, slot: number) =>
+    settled.current ? 0 : 120 + dayIdx * 70 + slot * 110;
+
   const renderCell = (day: PlanDay, slot: number, compact = false) => {
-    const animate = settled.current;
+    const animate = true;
+    const delay = delayFor(planDays.indexOf(day), slot);
     const saved = savedAt(day.date, slot);
     if (saved) {
       return (
@@ -36,6 +42,7 @@ export default function Timetable({ data }: { data: PlanData }) {
           kind="saved"
           compact={compact}
           animate={animate}
+          delay={delay}
           color={colorOf(colors, saved.subject_id)}
           subjectName={subjectNameById.get(saved.subject_id) ?? "?"}
           unit={saved.unit}
@@ -53,6 +60,7 @@ export default function Timetable({ data }: { data: PlanData }) {
           kind="suggested"
           compact={compact}
           animate={animate}
+          delay={delay}
           color={colorOf(colors, rec.subjectId)}
           subjectName={rec.subjectName}
           unit={rec.unit}
@@ -75,10 +83,14 @@ export default function Timetable({ data }: { data: PlanData }) {
 
   const renderCapacity = (day: PlanDay) => {
     const fills = dayColors(day);
+    const barDelay = settled.current ? 0 : 420 + planDays.indexOf(day) * 70;
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex h-2 bg-ground" role="img" aria-label={`공부 가능 ${day.availableHours}시간`}>
-          <div className="flex h-full" style={{ width: `${(day.availableHours / maxHours) * 100}%` }}>
+          <div
+            className="bar-grow flex h-full"
+            style={{ width: `${(day.availableHours / maxHours) * 100}%`, animationDelay: `${barDelay}ms` }}
+          >
             {fills.map((c, i) => (
               <span key={i} className="h-full flex-1" style={{ backgroundColor: c }} />
             ))}
@@ -124,7 +136,7 @@ export default function Timetable({ data }: { data: PlanData }) {
             {planDays.map((day) =>
               isRestDay(day) ? (
                 <div key={day.date} className="row-span-2 bg-sheet p-1">
-                  <PlanCell kind="rest" />
+                  <PlanCell kind="rest" animate delay={delayFor(planDays.indexOf(day), 0)} />
                 </div>
               ) : (
                 <div key={day.date} className="bg-sheet p-1">
@@ -192,7 +204,7 @@ export default function Timetable({ data }: { data: PlanData }) {
               </div>
               <div className="flex flex-col gap-2">
                 {isRestDay(day) ? (
-                  <PlanCell kind="rest" compact />
+                  <PlanCell kind="rest" compact animate delay={delayFor(planDays.indexOf(day), 0)} />
                 ) : (
                   <div className="grid grid-cols-2 gap-1.5">
                     {renderCell(day, 0, true)}

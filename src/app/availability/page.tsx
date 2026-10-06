@@ -82,8 +82,8 @@ export default function AvailabilityPage() {
         description="요일마다 하루에 공부할 수 있는 시간이에요. 0시간인 날은 계획을 비워 둡니다."
         action={
           <div className="flex items-baseline gap-2">
-            <span className="text-sm text-ink-soft">한 주 합계</span>
-            <span className="text-[28px] font-extrabold tracking-tight">{weekTotal}시간</span>
+            <span className="text-sm text-shell-text">한 주 합계</span>
+            <span className="text-[30px] font-extrabold tracking-tight text-white">{weekTotal}시간</span>
           </div>
         }
       />

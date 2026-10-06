@@ -7,7 +7,7 @@ import { DAY_LABELS_FULL, dayOfWeekMonFirst } from "@/lib/scoring";
 import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
 import { ArrowRightIcon } from "@/components/Icons";
-import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame } from "@/components/ui";
+import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader } from "@/components/ui";
 
 // 처음 화면 = 오늘의 시간표. 오늘 공부할 칸(바로 체크 가능), 이번 주 축소 시간표, 우선순위 상위 과목.
 
@@ -39,12 +39,13 @@ export default function HomePage() {
   const todayPlan = planDays[0];
   const [, month, dayNum] = today.split("-").map(Number);
   const weekday = DAY_LABELS_FULL[dayOfWeekMonFirst(today)];
+  const dateTitle = `${month}월 ${dayNum}일 ${weekday}요일`;
 
   const cycleLine = (
-    <nav aria-label="사용 순서" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-muted">
+    <nav aria-label="사용 순서" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-shell-text">
       {CYCLE.map((step, i) => (
         <span key={step.href} className="flex items-center gap-2">
-          <Link href={step.href} className="font-semibold text-ink-soft hover:text-ink hover:underline">
+          <Link href={step.href} className="font-semibold text-white/90 hover:text-white hover:underline">
             {step.label}
           </Link>
           {i < CYCLE.length - 1 && <ArrowRightIcon className="h-3 w-3" />}
@@ -56,9 +57,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <PageFrame>
-        <div className="pb-6 pt-10">
-          <span className="block h-9 w-64 animate-pulse bg-rule" />
-        </div>
+        <PageHeader title={dateTitle}>{cycleLine}</PageHeader>
         <LoadingSplit label="오늘의 계획을 불러오는 중…" />
       </PageFrame>
     );
@@ -68,24 +67,19 @@ export default function HomePage() {
   if (error || subjects.length === 0) {
     return (
       <PageFrame>
-        <div className="flex max-w-2xl flex-col gap-5 pb-10 pt-12">
-          <ConfigNotice />
-          {error && <ErrorNotice>데이터를 불러오지 못했어요. {error}</ErrorNotice>}
-          <h1 className="text-[32px] font-extrabold leading-[1.18] tracking-[-0.035em] [text-wrap:balance] sm:text-[42px]">
-            아는 것만 반복하지 않도록, 공백이 큰 단원부터.
-          </h1>
-          <p className="max-w-[52ch] text-[16px] leading-relaxed text-ink-soft">
-            정답률, 개념 의미 유사도, 최근 학습일, 푼 문제 수, 시험까지 남은 날을 하나의 학습
-            점수(0~100)로 합칩니다. 점수가 낮을수록 학습 공백이 큰 단원이고, 그 순서대로 요일별
-            계획을 세웁니다.
-          </p>
-          <div>
-            <Link href="/input" className="btn-primary">
+        <PageHeader
+          title={<span className="[text-wrap:balance]">아는 것만 반복하지 않도록, 공백이 큰 단원부터.</span>}
+          description="정답률, 개념 의미 유사도, 최근 학습일, 푼 문제 수, 시험까지 남은 날을 하나의 학습 점수(0~100)로 합칩니다. 점수가 낮을수록 학습 공백이 큰 단원이고, 그 순서대로 요일별 계획을 세웁니다."
+        >
+          <div className="pt-2">
+            <Link href="/input" className="btn-light">
               첫 학습 결과 입력하기 <ArrowRightIcon className="h-4 w-4" />
             </Link>
           </div>
-          <div className="border-t border-rule pt-4">{cycleLine}</div>
-        </div>
+          <div className="pt-2">{cycleLine}</div>
+        </PageHeader>
+        <ConfigNotice />
+        {error && <ErrorNotice>데이터를 불러오지 못했어요. {error}</ErrorNotice>}
       </PageFrame>
     );
   }
@@ -94,13 +88,10 @@ export default function HomePage() {
 
   return (
     <PageFrame>
-      <div className="flex flex-col gap-2 pb-6 pt-8 sm:pt-10">
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.03em] sm:text-[34px]">
-          {month}월 {dayNum}일 {weekday}요일
-        </h1>
+      <PageHeader title={dateTitle}>
         {cycleLine}
-        <p className="text-[13px] text-ink-muted">결과를 다시 입력하면 점수와 계획이 새로 계산돼요.</p>
-      </div>
+        <p className="text-[13px] text-shell-text">결과를 다시 입력하면 점수와 계획이 새로 계산돼요.</p>
+      </PageHeader>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {/* 오늘 공부할 칸 */}

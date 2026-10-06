@@ -161,10 +161,10 @@ The whole app is a timetable pinned to a classroom board. A deep navy header ban
 
 The system is dense, flat and numeric. It reads as an objective analysis instrument: tabular figures everywhere, near-square corners, and one fixed 0–100 score ramp in which deeper vermilion means a larger study gap. Interest comes from the timetable's own materials: the navy frame around today's column, hatched rest days, dashed outlines on unsaved suggestions, struck-through and stamped completed blocks, and capacity bars at the foot of each day. It does not come from decoration. Generic white-card-with-shadow dashboards and pastel gamification were explicitly rejected.
 
-Motion is one short beat, and only for what changed: a block that a plan refresh replaced fills in left to right, and a newly completed block gets its check stamp. Nothing animates on first paint, and nothing animates under reduced motion.
+Motion is one authored beat: when the plan opens, the timetable fills in column by column (each day 70ms after the previous, period 2 after period 1), the capacity bars grow after the blocks, and an already-completed block gets its stamp once its cell has filled. After that, only what changed moves: a block replaced by a refresh fills in with no delay, and a newly completed block gets its stamp. Nothing animates under reduced motion.
 
 **Key Characteristics:**
-- Navy shell band, grey-green ground, white sheets, 1px rules; no elevation.
+- Navy shell band that continues below the nav as each page's title band (faint 40px white grid + oversized 월~일 header letters at 5% white), sheets overlapping its bottom 48px; grey-green ground ruled with a faint 40px navy grid; white sheets, 1px rules; no elevation.
 - Eight fixed subject colours assigned by subject creation order and identical across every screen.
 - One five-band score ramp (vermilion, deepest = lowest score) for every score in the app.
 - Near-square geometry: 0px on sheets, cells and chips; 2px only on interactive controls.
@@ -286,7 +286,7 @@ One timetable square, and the unit of the whole system.
 - **Suggested (unsaved):** paper with a 1px dashed subject-colour border and subject-colour text.
 - **Rest:** stripes with a paper "쉬는 날" tag.
 - **Size:** at least 84px tall (96px ≥1024px); compact cells are at least 56px.
-- **Motion:** `cell-fill` (clip-path wipe left to right, 420ms) only on cells created by a refresh after first paint. `stamp-in` (scale 1.6 → 1 and rotate -12° → -6°, 260ms) only on a newly completed cell. Both use `cubic-bezier(0.16, 1, 0.3, 1)`, and both are off under `prefers-reduced-motion`.
+- **Motion:** `cell-fill` (clip-path wipe left to right, 520ms, fill-mode both) on every cell when it mounts: on first load staggered by `120 + day×70 + period×110` ms, after a refresh with no delay; cells that persist across re-renders never replay. Capacity bars `bar-grow` (scaleX from the left, 600ms) staggered after the blocks. `stamp-in` (scale 1.6 → 1 and rotate -12° → -6°, 260ms) on a newly completed cell, or after its cell fills on first load. The title band's day letters `band-rise` once (900ms). All use `cubic-bezier(0.16, 1, 0.3, 1)`, and all are off under `prefers-reduced-motion`.
 
 ### Score Bar and Capacity Bar
 - **Score bar:** an 8px track (12px thick variant) in ground, filled to score% with that score's ramp band, with 1px paper ticks at 25/50/75. Width transitions over 500ms ease-out.
@@ -304,7 +304,7 @@ A fixed-column list: a 28px rank numeral, subject chip + name (16px/700) + optio
 - **Do** mark today with the 3px navy frame, navy header cell and "오늘", and mark completion with tint + strike-through + rotated check stamp together.
 - **Do** use dashed borders for anything not yet saved or created, and stripes for rest days.
 - **Do** keep text at 12px or larger, figures tabular, and key numbers extra-bold (800).
-- **Do** animate only cells that changed after first paint, with the 420ms fill or 260ms stamp, and disable both under reduced motion.
+- **Do** fill the timetable column by column when the plan opens, then animate only cells that change; disable all motion under reduced motion.
 - **Do** fold the timetable into day rows below 768px instead of scrolling it sideways.
 
 ### Don't:

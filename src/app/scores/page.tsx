@@ -90,7 +90,7 @@ export default function ScoresPage() {
       <PageHeader
         title="학습 점수"
         description="단원별 최종 학습 점수와 그 근거, 기록할 때마다 점수가 어떻게 바뀌었는지 봅니다."
-        action={<ScoreLegend />}
+        action={<ScoreLegend onDark />}
       />
       <ConfigNotice />
       {error && <ErrorNotice>데이터를 불러오지 못했어요. {error}</ErrorNotice>}

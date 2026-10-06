@@ -4,27 +4,62 @@ import { isSupabaseConfigured } from "@/lib/supabaseClient";
 import { scoreColor } from "@/lib/palette";
 import { AlertIcon } from "@/components/Icons";
 
-/** 화면 제목. 큰 제목 + 한 줄 설명, 오른쪽에 화면별 동작을 둘 수 있다. */
+const BAND_DAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
+
+/**
+ * 화면 제목 + 진남색 밴드.
+ * 상단 메뉴의 진남색이 그대로 내려와 제목을 감싸고, 그 아래 흰 시트들이 밴드 끝에 살짝 걸친다.
+ * 밴드 안에는 큰 시간표의 머리줄처럼 아주 옅은 요일 글자와 세로 괘선이 깔린다.
+ */
 export function PageHeader({
   title,
   description,
   action,
+  children,
 }: {
-  title: string;
+  title: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 pb-6 pt-8 sm:flex-row sm:items-end sm:justify-between sm:pt-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-ink sm:text-[34px]">
-          {title}
-        </h1>
-        {description && (
-          <p className="max-w-[60ch] text-[15px] leading-relaxed text-ink-soft">{description}</p>
-        )}
+    <div className="relative -mb-12 pb-[84px] pt-8 text-white sm:pt-12">
+      <div
+        aria-hidden
+        className="absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden bg-shell"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.045) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+          backgroundPosition: "center top",
+        }}
+      >
+        <div className="relative mx-auto h-full max-w-7xl">
+          <div className="band-rise absolute bottom-12 right-0 hidden select-none md:flex">
+            {BAND_DAYS.map((d) => (
+              <span
+                key={d}
+                className="flex w-[84px] items-end justify-center border-l border-white/[0.07] pb-1 text-[84px] font-extrabold leading-[0.8] text-white/[0.05] lg:w-[104px] lg:text-[104px]"
+              >
+                {d}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
-      {action}
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-2.5">
+          <h1 className="text-[30px] font-extrabold leading-tight tracking-[-0.03em] sm:text-[38px]">
+            {title}
+          </h1>
+          {description && (
+            <p className="max-w-[60ch] text-[15px] leading-relaxed text-shell-text">{description}</p>
+          )}
+          {children}
+        </div>
+        {action}
+      </div>
     </div>
   );
 }
@@ -32,13 +67,12 @@ export function PageHeader({
 export function PageFrame({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
     <main
-      className={`mx-auto flex w-full flex-col px-4 pb-16 sm:px-6 ${narrow ? "max-w-3xl" : "max-w-7xl"}`}
+      className={`relative isolate mx-auto flex w-full flex-col px-4 pb-16 sm:px-6 ${narrow ? "max-w-3xl" : "max-w-7xl"}`}
     >
       {children}
     </main>
   );
 }
-
 /** 과목 색 칩: 과목 색 코드가 이름보다 먼저 읽히도록 */
 export function SubjectChip({ color, className }: { color: string; className?: string }) {
   return (
@@ -79,9 +113,9 @@ export function ScoreBar({
 }
 
 /** 점수 램프 범례 (0~100, 낮을수록 공백이 큼) */
-export function ScoreLegend() {
+export function ScoreLegend({ onDark }: { onDark?: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-ink-muted">
+    <div className={`flex items-center gap-2 text-xs ${onDark ? "text-shell-text" : "text-ink-muted"}`}>
       <span>공백 큼</span>
       <span className="flex">
         {[10, 30, 50, 70, 90].map((s) => (

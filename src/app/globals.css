@@ -11,6 +11,12 @@
     @apply bg-ground font-sans text-ink antialiased;
     font-feature-settings: "tnum" 1;
     word-break: keep-all;
+    /* 시간표 괘선 종이: 40px 간격의 아주 옅은 가로·세로 줄 */
+    background-image:
+      linear-gradient(to right, rgba(24, 35, 58, 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(24, 35, 58, 0.045) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center top;
   }
 
   ::selection {
@@ -81,6 +87,11 @@
     @apply btn bg-shell text-white hover:bg-shell-raised disabled:bg-rule-strong disabled:text-white;
   }
 
+  /* 진남색 밴드 위에서 쓰는 밝은 버튼 */
+  .btn-light {
+    @apply btn bg-white text-shell hover:bg-[#E6EBF5];
+  }
+
   .btn-quiet {
     @apply btn border border-rule-strong bg-sheet text-ink hover:border-ink hover:bg-ground disabled:text-ink-muted disabled:hover:border-rule-strong disabled:hover:bg-sheet;
   }
@@ -123,8 +134,39 @@
   }
 }
 
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes band-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* both: 시간차(delay) 동안은 빈 칸으로 기다렸다가 채워진다 */
 .cell-fill {
-  animation: cell-fill 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: cell-fill 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 상단 밴드의 큰 요일 글자가 한 번 떠오른다 */
+.band-rise {
+  animation: band-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .stamp-in {
@@ -133,7 +175,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cell-fill,
-  .stamp-in {
+  .stamp-in,
+  .bar-grow,
+  .band-rise {
     animation: none;
   }
 }

@@ -15,8 +15,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 bg-shell text-white">
+    <div className="flex min-h-screen flex-col overflow-x-clip">
+      <header className="sticky top-0 z-20 border-b border-white/[0.08] bg-shell text-white">
         <div className="mx-auto flex max-w-7xl flex-col sm:h-14 sm:flex-row sm:items-stretch sm:justify-between sm:px-6">
           <Link
             href="/"

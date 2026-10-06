@@ -9,10 +9,11 @@ import { CheckIcon } from "@/components/Icons";
 //  - suggested: 아직 저장 안 된 추천 → 과목 색 점선 테두리.
 //  - rest: 공부 가능 시간이 0인 날. 두 교시를 합친 빗금 칸.
 //
-// 움직임은 '바뀐 칸'에만: 페이지가 처음 그려질 때는 정지 상태이고,
-// 그 뒤 갱신으로 새로 생긴 칸(animate)만 채워지는 전환을, 새로 완료한 칸만 도장 전환을 한다.
+// 움직임: 칸이 처음 생길 때(화면에 들어올 때, 갱신으로 바뀌었을 때) 왼쪽부터 채워진다.
+// delay로 요일·교시마다 시간차를 줘서 시간표가 차례로 채워지는 것처럼 보이게 한다.
+// 이미 있던 칸은 다시 그려져도 전환이 반복되지 않고, 새로 완료한 칸만 도장이 찍힌다.
 
-type Common = { compact?: boolean; animate?: boolean };
+type Common = { compact?: boolean; animate?: boolean; delay?: number };
 
 type Props = Common &
   (
@@ -31,22 +32,24 @@ type Props = Common &
   );
 
 export default function PlanCell(props: Props) {
-  // 처음 마운트될 때의 값만 기억한다 (이후 리렌더에서 클래스가 붙어 전환이 다시 도는 것을 막음)
+  // 처음 마운트될 때의 값만 기억한다 (이후 리렌더에서 전환이 다시 도는 것을 막음)
   const [fillOnMount] = useState(Boolean(props.animate));
+  const [delayOnMount] = useState(props.delay ?? 0);
   const [initiallyCompleted] = useState(props.kind === "saved" && props.completed);
 
   const minH = props.compact ? "min-h-[56px]" : "min-h-[84px] lg:min-h-[96px]";
   const fill = fillOnMount ? "cell-fill" : "";
+  const motion = fillOnMount ? { animationDelay: `${delayOnMount}ms` } : undefined;
   const subjectText = props.compact ? "text-[12px]" : "text-[12px] lg:text-[13px]";
   const unitText = props.compact ? "text-[14px]" : "text-[14px] lg:text-[16px]";
 
   if (props.kind === "rest") {
     return (
       <div
-        className={`flex h-full ${minH} items-center justify-center text-[13px] font-semibold text-ink-muted`}
+        className={`${fill} flex h-full ${minH} items-center justify-center text-[13px] font-semibold text-ink-muted`}
         style={{
-          backgroundImage:
-            "repeating-linear-gradient(135deg, #E9EDEB 0 6px, #FFFFFF 6px 12px)",
+          ...motion,
+          backgroundImage: "repeating-linear-gradient(135deg, #E9EDEB 0 6px, #FFFFFF 6px 12px)",
         }}
       >
         <span className="bg-sheet px-2 py-0.5">쉬는 날</span>
@@ -62,7 +65,7 @@ export default function PlanCell(props: Props) {
     return (
       <div
         className={`${fill} flex h-full ${minH} flex-col justify-between gap-1 border border-dashed bg-sheet p-2`}
-        style={{ borderColor: props.color, color: props.color }}
+        style={{ ...motion, borderColor: props.color, color: props.color }}
       >
         <span className={`${subjectText} font-semibold leading-none`}>{props.subjectName}</span>
         <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
@@ -88,8 +91,13 @@ export default function PlanCell(props: Props) {
       {completed ? (
         <span
           aria-hidden
-          className={`${initiallyCompleted ? "rotate-[-6deg]" : "stamp-in"} absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center border-2`}
-          style={{ borderColor: color, color }}
+          className={`stamp-in absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center border-2`}
+          style={{
+            borderColor: color,
+            color,
+            // 처음부터 완료였던 칸은 칸이 다 채워진 뒤에 도장이 찍힌다
+            animationDelay: initiallyCompleted && fillOnMount ? `${delayOnMount + 380}ms` : undefined,
+          }}
         >
           <CheckIcon className="h-3.5 w-3.5" />
         </span>
@@ -105,8 +113,8 @@ export default function PlanCell(props: Props) {
   );
 
   const style = completed
-    ? { backgroundColor: `color-mix(in srgb, ${color} 14%, white)`, color }
-    : { backgroundColor: color };
+    ? { ...motion, backgroundColor: `color-mix(in srgb, ${color} 14%, white)`, color }
+    : { ...motion, backgroundColor: color };
   const base = `${fill} relative flex h-full ${minH} flex-col justify-between gap-1 p-2 text-left transition-colors duration-300`;
 
   if (!checkable) {
