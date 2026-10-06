@@ -2,12 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body {
-  background-color: #eef7fb;
-  color: #12324a;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ground font-sans text-ink antialiased;
+    font-feature-settings: "tnum" 1;
+    word-break: keep-all;
+  }
+
+  ::selection {
+    background: #18233a;
+    color: #ffffff;
+  }
+
+  input,
+  textarea {
+    caret-color: #2459c8;
+  }
+
+  :focus-visible {
+    outline: 2px solid #2459c8;
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  * {
+    scrollbar-color: #a9b3af transparent;
+    scrollbar-width: thin;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  cursor: pointer;
+@layer components {
+  /* 인쇄된 시트: 그림자 없이 1px 괘선 */
+  .sheet {
+    @apply border border-rule bg-sheet;
+  }
+
+  .sheet-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-rule px-5 py-3;
+  }
+
+  .sheet-title {
+    @apply text-[15px] font-bold tracking-tight text-ink;
+  }
+
+  .field-label {
+    @apply text-[13px] font-semibold text-ink;
+  }
+
+  .field-hint {
+    @apply text-xs text-ink-muted;
+  }
+
+  .field {
+    @apply w-full rounded-sm border border-rule-strong bg-sheet px-3 py-2.5 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-muted/70 hover:border-ink-muted focus:border-ink focus-visible:outline-none focus:ring-2 focus:ring-[#2459C8]/25 disabled:bg-ground disabled:text-ink-muted;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-shell text-white hover:bg-shell-raised disabled:bg-rule-strong disabled:text-white;
+  }
+
+  .btn-quiet {
+    @apply btn border border-rule-strong bg-sheet text-ink hover:border-ink hover:bg-ground disabled:text-ink-muted disabled:hover:border-rule-strong disabled:hover:bg-sheet;
+  }
+
+  .notice {
+    @apply border px-4 py-3 text-sm leading-relaxed;
+  }
+
+  .notice-error {
+    @apply notice border-gap-2/40 bg-gap-5/40 text-gap-1;
+  }
+
+  .notice-warn {
+    @apply notice border-warn/30 bg-[#FBF1DF] text-[#6E4100];
+  }
+
+  .notice-ok {
+    @apply notice border-ok/30 bg-[#E3F2EB] text-[#0B5A3E];
+  }
+}
+
+/* 시그니처: 시간표 칸이 채워지거나 완료 도장이 찍히는 한 번의 짧은 전환 */
+@keyframes cell-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    transform: scale(1.6) rotate(-12deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(-6deg);
+    opacity: 1;
+  }
+}
+
+.cell-fill {
+  animation: cell-fill 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stamp-in {
+  animation: stamp-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell-fill,
+  .stamp-in {
+    animation: none;
+  }
 }

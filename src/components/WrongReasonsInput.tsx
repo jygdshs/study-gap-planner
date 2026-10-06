@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CloseIcon, PlusIcon } from "@/components/Icons";
 
 interface Props {
   value: string[];
@@ -46,42 +47,44 @@ export default function WrongReasonsInput({ value, onChange, max = 4 }: Props) {
           placeholder={
             value.length >= max
               ? `최대 ${max}개까지 입력할 수 있어요`
-              : "예: 개념을 헷갈림, 계산 실수, 시간 부족"
+              : "예: 계산 실수 (Enter로 추가)"
           }
           disabled={value.length >= max}
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy disabled:bg-slate-100"
+          aria-label="틀린 이유"
+          className="field flex-1"
         />
         <button
           type="button"
           onClick={addReason}
           disabled={value.length >= max || !draft.trim()}
-          className="rounded-lg bg-brand-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="btn-quiet shrink-0 px-3"
         >
+          <PlusIcon className="h-4 w-4" />
           추가
         </button>
       </div>
 
-      {value.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
-          {value.map((reason, idx) => (
-            <li
-              key={`${reason}-${idx}`}
-              className="flex items-center gap-1 rounded-full bg-brand-blue px-3 py-1 text-xs text-brand-navy"
+      <div className="flex flex-wrap items-center gap-1.5">
+        {value.map((reason, idx) => (
+          <span
+            key={`${reason}-${idx}`}
+            className="flex items-center gap-1 border border-ink bg-sheet py-1 pl-2.5 pr-1 text-[13px] font-semibold"
+          >
+            {reason}
+            <button
+              type="button"
+              onClick={() => removeReason(idx)}
+              aria-label={`${reason} 삭제`}
+              className="flex h-5 w-5 items-center justify-center text-ink-muted hover:bg-ground hover:text-ink"
             >
-              {reason}
-              <button
-                type="button"
-                onClick={() => removeReason(idx)}
-                aria-label={`${reason} 삭제`}
-                className="ml-1 font-bold text-brand-navy/70 hover:text-brand-navy"
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <span className="text-xs text-slate-400">{value.length}/{max}개 입력됨</span>
+              <CloseIcon className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <span className="text-xs text-ink-muted">
+          {value.length}/{max}개
+        </span>
+      </div>
     </div>
   );
 }

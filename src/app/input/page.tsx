@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { todayISO } from "@/lib/scoring";
+import { supabase } from "@/lib/supabaseClient";
+import { textSimilarity, todayISO } from "@/lib/scoring";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
+import { ArrowRightIcon } from "@/components/Icons";
+import { ConfigNotice, PageFrame, PageHeader, ScoreBar } from "@/components/ui";
 import type { RecordType } from "@/types/study";
 
 // toISOString()은 UTC 기준이라 한국 시간 오전 9시 전에는 '어제' 날짜가 나온다.
 // 그래서 로컬 날짜를 쓰는 scoring.ts의 todayISO를 사용한다.
+
+const TYPE_OPTIONS: { value: RecordType; label: string; hint: string }[] = [
+  { value: "problem", label: "문제 풀이", hint: "정답률로 채점" },
+  { value: "concept", label: "개념 의미", hint: "기준 의미와 유사도로 채점" },
+];
 
 export default function InputPage() {
   const [subjectId, setSubjectId] = useState("");
@@ -31,7 +38,7 @@ export default function InputPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  // 7차시: 학습 계획 화면의 "결과 입력 →" 링크로 들어오면 과목·단원을 미리 채워 둔다
+  // 7차시: 학습 계획 화면의 "결과 입력" 링크로 들어오면 과목·단원을 미리 채워 둔다
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const subject = params.get("subject");
@@ -114,184 +121,205 @@ export default function InputPage() {
     setWrongReasons([]);
   };
 
+  // 저장 전 미리보기: 이 기록 하나의 기본 점수(감점 전). scoring.ts와 같은 계산.
+  const total = Number(problemsTotal);
+  const correct = Number(problemsCorrect);
+  const preview: { label: string; value: number } | null =
+    recordType === "problem"
+      ? problemsTotal !== "" && problemsCorrect !== "" && total > 0 && correct <= total
+        ? { label: "정답률", value: Math.round((correct / total) * 1000) / 10 }
+        : null
+      : conceptReference.trim() && conceptAnswer.trim()
+        ? {
+            label: "의미 유사도",
+            value: Math.round(textSimilarity(conceptReference, conceptAnswer) * 1000) / 10,
+          }
+        : null;
+
+  const countFields = [
+    { label: "문제 풀이 수", value: problemsTotal, set: setProblemsTotal },
+    { label: "맞은 문제 수", value: problemsCorrect, set: setProblemsCorrect },
+    { label: "틀린 문제 수", value: problemsWrong, set: setProblemsWrong },
+  ];
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
-      <header className="rounded-xl bg-brand-orange px-6 py-5 text-center shadow-sm">
-        <h1 className="text-lg font-bold text-brand-navy sm:text-xl">
-          과목 입력 · 학습 공백 분석 및 개인별 학습 계획 추천 시스템
-        </h1>
-      </header>
+    <PageFrame>
+      <PageHeader
+        title="학습 결과 입력"
+        description="공부를 마친 단원의 결과를 남기면 학습 점수와 계획이 다시 계산됩니다."
+      />
+      <ConfigNotice />
 
-      <Link href="/" className="text-sm text-brand-navy underline underline-offset-2">
-        ← 처음으로
-      </Link>
-
-      {!isSupabaseConfigured && (
-        <p className="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-800">
-          Supabase 연결이 아직 설정되지 않았어요. 프로젝트 루트에 <code>.env.local</code> 을
-          만들고 <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
-          값을 넣은 뒤 다시 실행해 주세요. (README.md 1~2번 참고)
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        {/* 공통 입력: 과목 / 단원 / 유형 */}
-        <section className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-brand-navy">과목 입력</label>
-            <SubjectPicker subjectId={subjectId} onSubjectChange={setSubjectId} />
+      <form
+        onSubmit={handleSubmit}
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+        noValidate
+      >
+        {/* 무엇을 공부했나 */}
+        <section className="sheet" aria-labelledby="what-title">
+          <div className="sheet-head">
+            <h2 id="what-title" className="sheet-title">
+              무엇을 공부했나요
+            </h2>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-brand-navy">단원 입력</label>
-            <input
-              type="text"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              placeholder="예: 응용수학 단원 1"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-brand-navy">유형 입력</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => resetTypeFields("problem")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
-                  recordType === "problem"
-                    ? "border-brand-navy bg-brand-navy text-white"
-                    : "border-slate-300 text-slate-600"
-                }`}
-              >
-                문제 풀이
-              </button>
-              <button
-                type="button"
-                onClick={() => resetTypeFields("concept")}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
-                  recordType === "concept"
-                    ? "border-brand-navy bg-brand-navy text-white"
-                    : "border-slate-300 text-slate-600"
-                }`}
-              >
-                개념 의미
-              </button>
+          <div className="flex flex-col gap-6 p-5">
+            <div className="flex flex-col gap-2">
+              <span className="field-label" id="subject-label">
+                과목
+              </span>
+              <SubjectPicker subjectId={subjectId} onSubjectChange={setSubjectId} />
             </div>
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-brand-navy">학습 날짜</label>
-            <input
-              type="date"
-              value={studyDate}
-              onChange={(e) => setStudyDate(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-            />
+            <label className="flex flex-col gap-2">
+              <span className="field-label">단원</span>
+              <input
+                type="text"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="예: 미분"
+                className="field"
+              />
+            </label>
+
+            <div className="flex flex-col gap-2">
+              <span className="field-label">유형</span>
+              <div role="radiogroup" aria-label="유형" className="grid grid-cols-2 border border-rule-strong">
+                {TYPE_OPTIONS.map((opt, i) => {
+                  const active = recordType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => resetTypeFields(opt.value)}
+                      className={`flex flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors ${
+                        i === 1 ? "border-l border-rule-strong" : ""
+                      } ${active ? "bg-shell text-white" : "bg-sheet text-ink hover:bg-ground"}`}
+                    >
+                      <span className="text-sm font-bold">{opt.label}</span>
+                      <span className={`text-[11px] ${active ? "text-shell-text" : "text-ink-muted"}`}>
+                        {opt.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="flex flex-col gap-2">
+              <span className="field-label">학습 날짜</span>
+              <input
+                type="date"
+                value={studyDate}
+                onChange={(e) => setStudyDate(e.target.value)}
+                className="field sm:max-w-[220px]"
+              />
+            </label>
           </div>
         </section>
 
-        {/* 유형별 입력 */}
-        {recordType === "problem" ? (
-          <section className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-brand-navy">과목/단원 문제 풀이</h2>
-
-            <div className="grid grid-cols-3 gap-3">
-              <label className="flex flex-col gap-1 text-xs text-slate-500">
-                문제 풀이 수
-                <input
-                  type="number"
-                  min={0}
-                  value={problemsTotal}
-                  onChange={(e) => setProblemsTotal(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-500">
-                맞은 문제 수
-                <input
-                  type="number"
-                  min={0}
-                  value={problemsCorrect}
-                  onChange={(e) => setProblemsCorrect(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-500">
-                틀린 문제 수
-                <input
-                  type="number"
-                  min={0}
-                  value={problemsWrong}
-                  onChange={(e) => setProblemsWrong(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-                />
-              </label>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-brand-navy">
-                틀린 이유 (대표적인 이유 3~4개)
-              </label>
-              <WrongReasonsInput value={wrongReasons} onChange={setWrongReasons} />
-            </div>
-          </section>
-        ) : (
-          <section className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-brand-navy">과목/단원 개념 의미</h2>
-
-            <label className="flex flex-col gap-1 text-xs text-slate-500">
-              기준 의미 입력 (없으면 인터넷에 있는 의미를 참고)
-              <textarea
-                value={conceptReference}
-                onChange={(e) => setConceptReference(e.target.value)}
-                rows={3}
-                placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-xs text-slate-500">
-              채점할 의미 입력 (내가 이해한 대로 직접 작성)
-              <textarea
-                value={conceptAnswer}
-                onChange={(e) => setConceptAnswer(e.target.value)}
-                rows={3}
-                placeholder="내가 이해한 개념의 의미를 적어 보세요."
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy"
-              />
-            </label>
+        {/* 결과 */}
+        <section className="sheet" aria-labelledby="result-title">
+          <div className="sheet-head">
+            <h2 id="result-title" className="sheet-title">
+              {recordType === "problem" ? "문제 풀이 결과" : "개념 의미"}
+            </h2>
+          </div>
+          <div className="flex flex-col gap-6 p-5">
+            {recordType === "problem" ? (
+              <div className="grid grid-cols-3 gap-3">
+                {countFields.map((f) => (
+                  <label key={f.label} className="flex flex-col gap-2">
+                    <span className="field-label">{f.label}</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={f.value}
+                      onChange={(e) => f.set(e.target.value)}
+                      className="field text-[20px] font-bold"
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <>
+                <label className="flex flex-col gap-2">
+                  <span className="field-label">기준 의미</span>
+                  <span className="field-hint">교과서나 인터넷에 있는 정확한 의미</span>
+                  <textarea
+                    value={conceptReference}
+                    onChange={(e) => setConceptReference(e.target.value)}
+                    rows={3}
+                    placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
+                    className="field resize-y leading-relaxed"
+                  />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="field-label">채점할 의미</span>
+                  <span className="field-hint">보지 않고 내가 이해한 대로 직접 작성</span>
+                  <textarea
+                    value={conceptAnswer}
+                    onChange={(e) => setConceptAnswer(e.target.value)}
+                    rows={3}
+                    placeholder="내가 이해한 개념의 의미를 적어 보세요."
+                    className="field resize-y leading-relaxed"
+                  />
+                </label>
+              </>
+            )}
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-brand-navy">
-                틀린 이유 (대표적인 이유 3~4개)
-              </label>
+              <span className="field-label">
+                틀린 이유 <span className="font-normal text-ink-muted">대표적인 이유 3~4개</span>
+              </span>
               <WrongReasonsInput value={wrongReasons} onChange={setWrongReasons} />
             </div>
-          </section>
-        )}
 
-        {message && (
-          <p
-            className={`rounded-lg px-4 py-3 text-sm ${
-              message.type === "ok"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-red-100 text-red-600"
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
+            <div className="flex flex-col gap-2 border-t border-rule pt-5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-semibold text-ink-soft">
+                  이 기록의 기본 점수 <span className="font-normal text-ink-muted">(감점 전)</span>
+                </span>
+                <span className="text-[22px] font-extrabold tracking-tight">
+                  {preview ? (
+                    <>
+                      {preview.value}
+                      <span className="ml-1 text-xs font-semibold text-ink-muted">
+                        {preview.label}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-ink-muted">—</span>
+                  )}
+                </span>
+              </div>
+              <ScoreBar score={preview?.value ?? 0} />
+            </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-xl bg-brand-navy px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
-        >
-          {submitting ? "저장 중..." : "학습 결과 저장하기"}
-        </button>
+            {message && (
+              <div
+                role={message.type === "error" ? "alert" : "status"}
+                className={`flex flex-wrap items-center justify-between gap-2 ${
+                  message.type === "ok" ? "notice-ok" : "notice-error"
+                }`}
+              >
+                <span>{message.text}</span>
+                {message.type === "ok" && (
+                  <Link href="/plan" className="flex items-center gap-1 font-semibold underline">
+                    바뀐 계획 보기 <ArrowRightIcon className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </div>
+            )}
+
+            <button type="submit" disabled={submitting} className="btn-primary py-3.5 text-[15px]">
+              {submitting ? "저장 중…" : "학습 결과 저장하기"}
+            </button>
+          </div>
+        </section>
       </form>
-    </main>
+    </PageFrame>
   );
 }

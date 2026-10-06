@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T00:00:00+09:00",
+  "title": "Design System: 학습 공백 분석",
+  "extensions": {
+    "colorMeta": {
+      "shell": { "role": "primary", "displayName": "Timetable Navy", "canonical": "#18233A", "tonalRamp": ["#0B1120", "#18233A", "#22304D", "#34425F", "#5F6B7E", "#A3ADC0", "#C9D2E3", "#EEF1F7"] },
+      "shell-raised": { "role": "primary", "displayName": "Navy Raised", "canonical": "#22304D", "tonalRamp": ["#0B1120", "#18233A", "#22304D", "#34425F", "#5F6B7E", "#A3ADC0", "#C9D2E3", "#EEF1F7"] },
+      "shell-line": { "role": "primary", "displayName": "Navy Rule", "canonical": "#34425F", "tonalRamp": ["#0B1120", "#18233A", "#22304D", "#34425F", "#5F6B7E", "#A3ADC0", "#C9D2E3", "#EEF1F7"] },
+      "shell-text": { "role": "primary", "displayName": "Header Chalk", "canonical": "#C9D2E3", "tonalRamp": ["#0B1120", "#18233A", "#22304D", "#34425F", "#5F6B7E", "#A3ADC0", "#C9D2E3", "#EEF1F7"] },
+      "ink": { "role": "neutral", "displayName": "Timetable Navy Ink", "canonical": "#18233A", "tonalRamp": ["#0B1120", "#18233A", "#46536A", "#5F6B7E", "#8A94A5", "#B5BCC8", "#DDE1E8", "#F3F5F8"] },
+      "ink-soft": { "role": "neutral", "displayName": "Soft Ink", "canonical": "#46536A", "tonalRamp": ["#0B1120", "#18233A", "#46536A", "#5F6B7E", "#8A94A5", "#B5BCC8", "#DDE1E8", "#F3F5F8"] },
+      "ink-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#5F6B7E", "tonalRamp": ["#0B1120", "#18233A", "#46536A", "#5F6B7E", "#8A94A5", "#B5BCC8", "#DDE1E8", "#F3F5F8"] },
+      "ground": { "role": "neutral", "displayName": "Board", "canonical": "#E9EDEB", "tonalRamp": ["#2E3532", "#4B5551", "#6E7874", "#A9B3AF", "#D3D9D6", "#E9EDEB", "#F3F5F4", "#FAFBFA"] },
+      "sheet": { "role": "neutral", "displayName": "Paper", "canonical": "#FFFFFF", "tonalRamp": ["#2E3532", "#4B5551", "#6E7874", "#A9B3AF", "#D3D9D6", "#E9EDEB", "#F7F8F8", "#FFFFFF"] },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#D3D9D6", "tonalRamp": ["#2E3532", "#4B5551", "#6E7874", "#A9B3AF", "#D3D9D6", "#E9EDEB", "#F3F5F4", "#FAFBFA"] },
+      "rule-strong": { "role": "neutral", "displayName": "Strong Rule", "canonical": "#A9B3AF", "tonalRamp": ["#2E3532", "#4B5551", "#6E7874", "#A9B3AF", "#D3D9D6", "#E9EDEB", "#F3F5F4", "#FAFBFA"] },
+      "today-tint": { "role": "neutral", "displayName": "Today Tint", "canonical": "#F1F3F7", "tonalRamp": ["#0B1120", "#18233A", "#46536A", "#5F6B7E", "#A3ADC0", "#DDE1E8", "#F1F3F7", "#FAFBFC"] },
+      "interaction-blue": { "role": "tertiary", "displayName": "Interaction Blue", "canonical": "#2459C8", "tonalRamp": ["#0E2457", "#173D8C", "#2459C8", "#4C7BDB", "#7F9FE6", "#B3C6F1", "#DCE5F8", "#F1F5FC"] },
+      "gap-1": { "role": "secondary", "displayName": "Gap Ramp 0–19 (Deep Vermilion)", "canonical": "#9E2A1C", "tonalRamp": ["#5E170F", "#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8", "#FBE9E3", "#FEF6F3"] },
+      "gap-2": { "role": "secondary", "displayName": "Gap Ramp 20–39 (Vermilion)", "canonical": "#C2412C", "tonalRamp": ["#5E170F", "#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8", "#FBE9E3", "#FEF6F3"] },
+      "gap-3": { "role": "secondary", "displayName": "Gap Ramp 40–59 (Coral)", "canonical": "#DD6E4E", "tonalRamp": ["#5E170F", "#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8", "#FBE9E3", "#FEF6F3"] },
+      "gap-4": { "role": "secondary", "displayName": "Gap Ramp 60–79 (Salmon)", "canonical": "#EDA58F", "tonalRamp": ["#5E170F", "#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8", "#FBE9E3", "#FEF6F3"] },
+      "gap-5": { "role": "secondary", "displayName": "Gap Ramp 80–100 (Blush)", "canonical": "#F6D3C8", "tonalRamp": ["#5E170F", "#9E2A1C", "#C2412C", "#DD6E4E", "#EDA58F", "#F6D3C8", "#FBE9E3", "#FEF6F3"] },
+      "ok": { "role": "neutral", "displayName": "Status Green", "canonical": "#127A55", "tonalRamp": ["#073222", "#0B5A3E", "#127A55", "#2E9A72", "#62B996", "#A5D8C1", "#E3F2EB", "#F3FAF6"] },
+      "warn": { "role": "neutral", "displayName": "Status Amber", "canonical": "#9A5B00", "tonalRamp": ["#3D2400", "#6E4100", "#9A5B00", "#C07A12", "#DDA04A", "#EECB93", "#FBF1DF", "#FDF8EF"] },
+      "subject-1-blue": { "role": "tertiary", "displayName": "Subject 1 · Blue (파랑)", "canonical": "#2459C8", "tonalRamp": ["#0E2457", "#173D8C", "#2459C8", "#4C7BDB", "#7F9FE6", "#B3C6F1", "#DCE5F8", "#F1F5FC"] },
+      "subject-2-green": { "role": "tertiary", "displayName": "Subject 2 · Green (초록)", "canonical": "#127A55", "tonalRamp": ["#073222", "#0B5A3E", "#127A55", "#2E9A72", "#62B996", "#A5D8C1", "#E3F2EB", "#F3FAF6"] },
+      "subject-3-amber": { "role": "tertiary", "displayName": "Subject 3 · Amber (호박)", "canonical": "#9A5B00", "tonalRamp": ["#3D2400", "#6E4100", "#9A5B00", "#C07A12", "#DDA04A", "#EECB93", "#FBF1DF", "#FDF8EF"] },
+      "subject-4-violet": { "role": "tertiary", "displayName": "Subject 4 · Violet (보라)", "canonical": "#6B3FC0", "tonalRamp": ["#2A1752", "#47288A", "#6B3FC0", "#8762D0", "#A68ADD", "#C9B8EB", "#E8E0F7", "#F6F2FC"] },
+      "subject-5-teal": { "role": "tertiary", "displayName": "Subject 5 · Teal (청록)", "canonical": "#0B7487", "tonalRamp": ["#03323A", "#075360", "#0B7487", "#2F95A6", "#66B4C1", "#A6D5DC", "#DDF0F2", "#F2F9FA"] },
+      "subject-6-magenta": { "role": "tertiary", "displayName": "Subject 6 · Magenta (자주)", "canonical": "#B4295F", "tonalRamp": ["#4C0E27", "#801C43", "#B4295F", "#C9567F", "#DA89A5", "#EBBDCD", "#F8E6EC", "#FCF4F7"] },
+      "subject-7-olive": { "role": "tertiary", "displayName": "Subject 7 · Olive (올리브)", "canonical": "#4E5E12", "tonalRamp": ["#1F2606", "#36420C", "#4E5E12", "#6C7E2E", "#94A35E", "#BEC898", "#E5EAD3", "#F5F7EE"] },
+      "subject-8-indigo": { "role": "tertiary", "displayName": "Subject 8 · Indigo (남보라)", "canonical": "#3F4C8C", "tonalRamp": ["#191F3A", "#2C3663", "#3F4C8C", "#6170A8", "#8A96C2", "#B9C1DE", "#E3E6F3", "#F4F5FA"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Empty-state home promise only; 32px mobile, 42px at ≥640px, balanced wrap." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles and the home date line; 28px mobile, 34px at ≥640px." },
+      "numeral": { "displayName": "Numeral", "purpose": "Key figures (adherence rate 40px); same voice at 22px rank, 18px score, 19px day label." },
+      "title": { "displayName": "Title", "purpose": "The main sheet on a screen (7일 시간표, 오늘 공부할 단원)." },
+      "sheet-title": { "displayName": "Sheet Title", "purpose": "Every other sheet head." },
+      "cell-unit": { "displayName": "Cell Unit", "purpose": "Unit name inside a plan block; 14px compact, 16px at ≥1024px." },
+      "body": { "displayName": "Body", "purpose": "Page descriptions and explanatory copy, max 60ch." },
+      "label": { "displayName": "Label", "purpose": "Field labels, period labels, sheet-head status lines, inline links." },
+      "caption": { "displayName": "Caption", "purpose": "Hints, dates, capacity readouts, footer. 12px is the floor." }
+    },
+    "shadows": [
+      { "name": "inset-stroke-1", "value": "inset 0 0 0 1px <subject colour>", "purpose": "Outline for an unsaved suggestion in the home mini timetable. A border, not elevation." },
+      { "name": "inset-stroke-2", "value": "inset 0 0 0 2px <subject colour>", "purpose": "Outline for a planned but incomplete adherence slot. A border, not elevation." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Easing for both signature transitions." },
+      { "name": "cell-fill", "value": "420ms; clip-path inset(0 100% 0 0) -> inset(0 0 0 0)", "purpose": "Left-to-right fill on plan cells created by a refresh after first paint. None under reduced motion." },
+      { "name": "stamp-in", "value": "260ms both; scale(1.6) rotate(-12deg), opacity 0 -> scale(1) rotate(-6deg), opacity 1", "purpose": "Check stamp on a newly completed plan cell. None under reduced motion." },
+      { "name": "nav-indicator", "value": "transform scaleX 200ms", "purpose": "Active tab underline bar in the navy shell." },
+      { "name": "score-bar-width", "value": "width 500ms ease-out", "purpose": "Score bar fill change." },
+      { "name": "cell-tint", "value": "colors 300ms", "purpose": "Plan cell fill change between planned and completed." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action per sheet (save or refresh plan, add subject, first input).",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" aria-hidden=\"true\"><path d=\"M20 11a8 8 0 10-2.4 5.7M20 5v6h-6\"/></svg>새 학습 점수로 계획 갱신</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; border-radius: 2px; padding: 10px 16px; background: #18233A; color: #FFFFFF; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 150ms; } .ds-btn-primary:hover { background: #22304D; } .ds-btn-primary:focus-visible { outline: 2px solid #2459C8; outline-offset: 2px; } .ds-btn-primary:disabled { background: #A9B3AF; color: #FFFFFF; cursor: not-allowed; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary actions and the settled state of a saved, up-to-date plan.",
+      "html": "<button class=\"ds-btn-quiet\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" aria-hidden=\"true\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg>최신 계획 저장됨</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #A9B3AF; border-radius: 2px; padding: 10px 16px; background: #FFFFFF; color: #18233A; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 150ms, border-color 150ms; } .ds-btn-quiet:hover { border-color: #18233A; background: #E9EDEB; } .ds-btn-quiet:focus-visible { outline: 2px solid #2459C8; outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text, number and date inputs with label above.",
+      "html": "<label class=\"ds-field-wrap\"><span class=\"ds-field-label\">과목명</span><input class=\"ds-field\" placeholder=\"예: 응용수학\"></label>",
+      "css": ".ds-field-wrap { display: flex; flex-direction: column; gap: 6px; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; } .ds-field-label { font-size: 13px; font-weight: 600; color: #18233A; } .ds-field { width: 100%; border: 1px solid #A9B3AF; border-radius: 2px; padding: 10px 12px; background: #FFFFFF; color: #18233A; font: inherit; font-size: 15px; outline: none; caret-color: #2459C8; transition: border-color 150ms, box-shadow 150ms; } .ds-field::placeholder { color: rgba(95,107,126,0.7); } .ds-field:hover { border-color: #5F6B7E; } .ds-field:focus { border-color: #18233A; box-shadow: 0 0 0 2px rgba(36,89,200,0.25); } .ds-field:disabled { background: #E9EDEB; color: #5F6B7E; }"
+    },
+    {
+      "name": "Shell Navigation",
+      "kind": "nav",
+      "refersTo": "nav-shell",
+      "description": "Sticky navy timetable header band with brand mark and four tabs.",
+      "html": "<header class=\"ds-shell\"><a class=\"ds-shell-brand\" href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"2\" y=\"2\" width=\"9\" height=\"9\" fill=\"#2459C8\"/><rect x=\"13\" y=\"2\" width=\"9\" height=\"9\" fill=\"#127A55\"/><rect x=\"2\" y=\"13\" width=\"9\" height=\"9\" fill=\"#9A5B00\"/><rect x=\"13.5\" y=\"13.5\" width=\"8\" height=\"8\" fill=\"none\" stroke=\"#C9D2E3\" stroke-width=\"1\"/></svg>학습 공백 분석</a><nav class=\"ds-shell-nav\"><a href=\"#\">결과 입력</a><a href=\"#\">공부 시간</a><a href=\"#\" aria-current=\"page\">학습 계획</a><a href=\"#\">학습 점수</a></nav></header>",
+      "css": ".ds-shell { display: flex; align-items: stretch; justify-content: space-between; height: 56px; padding: 0 24px; background: #18233A; color: #FFFFFF; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; } .ds-shell-brand { display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 700; letter-spacing: -0.025em; } .ds-shell-nav { display: flex; } .ds-shell-nav a { position: relative; display: flex; align-items: center; padding: 0 16px; color: #C9D2E3; text-decoration: none; font-size: 14px; font-weight: 600; transition: color 150ms; } .ds-shell-nav a:hover { color: #FFFFFF; } .ds-shell-nav a:focus-visible { outline: 2px solid #2459C8; outline-offset: 2px; } .ds-shell-nav a::after { content: ''; position: absolute; left: 16px; right: 16px; bottom: 0; height: 3px; background: #FFFFFF; transform: scaleX(0); transition: transform 200ms; } .ds-shell-nav a[aria-current='page'] { color: #FFFFFF; } .ds-shell-nav a[aria-current='page']::after { transform: scaleX(1); }"
+    },
+    {
+      "name": "Sheet",
+      "kind": "card",
+      "refersTo": "sheet",
+      "description": "Printed sheet on the board: 1px rule, no shadow, square corners, ruled head.",
+      "html": "<section class=\"ds-sheet\"><div class=\"ds-sheet-head\"><h2>우선순위</h2><span>낮은 점수부터</span></div><div class=\"ds-sheet-body\">시트 본문</div></section>",
+      "css": ".ds-sheet { border: 1px solid #D3D9D6; background: #FFFFFF; color: #18233A; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-feature-settings: 'tnum' 1; } .ds-sheet-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #D3D9D6; } .ds-sheet-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.025em; } .ds-sheet-head span { font-size: 12px; color: #5F6B7E; } .ds-sheet-body { padding: 20px; font-size: 15px; line-height: 1.625; color: #46536A; }"
+    },
+    {
+      "name": "Plan Cell",
+      "kind": "custom",
+      "refersTo": "plan-cell",
+      "description": "Signature timetable block: saved (solid subject colour), completed (tint, strike, stamp), suggested (dashed).",
+      "html": "<div class=\"ds-cells\"><label class=\"ds-cell\" style=\"--c:#2459C8\"><input type=\"checkbox\" class=\"ds-sr\"><span class=\"ds-cell-subj\">수학</span><span class=\"ds-cell-unit\">적분</span><span class=\"ds-cell-box\"></span></label><div class=\"ds-cell ds-cell-done\" style=\"--c:#2459C8\"><span class=\"ds-cell-subj\">수학</span><span class=\"ds-cell-unit\">미분</span><span class=\"ds-cell-stamp\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\" stroke-linejoin=\"miter\" aria-hidden=\"true\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg></span></div><div class=\"ds-cell ds-cell-sugg\" style=\"--c:#127A55\"><span class=\"ds-cell-subj\">국어</span><span class=\"ds-cell-unit\">문학</span></div></div>",
+      "css": ".ds-cells { display: grid; grid-template-columns: repeat(3, 120px); gap: 4px; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .ds-cell { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-height: 96px; padding: 8px; background: var(--c); color: #FFFFFF; cursor: pointer; transition: background-color 300ms; } .ds-cell:focus-within { outline: 2px solid #2459C8; outline-offset: 2px; } .ds-cell-subj { font-size: 13px; font-weight: 600; line-height: 1; opacity: 0.85; } .ds-cell-unit { padding-right: 24px; font-size: 16px; font-weight: 700; line-height: 1.375; } .ds-cell-box { position: absolute; right: 6px; bottom: 6px; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.9); transition: background-color 150ms; } .ds-cell:hover .ds-cell-box { background: rgba(255,255,255,0.25); } .ds-cell-done { background: color-mix(in srgb, var(--c) 14%, white); color: var(--c); } .ds-cell-done .ds-cell-subj { opacity: 1; } .ds-cell-done .ds-cell-unit { text-decoration: line-through; text-decoration-thickness: 2px; } .ds-cell-stamp { position: absolute; right: 6px; top: 6px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 2px solid var(--c); transform: rotate(-6deg); } .ds-cell-sugg { background: #FFFFFF; color: var(--c); border: 1px dashed var(--c); cursor: default; }"
+    },
+    {
+      "name": "Score Bar",
+      "kind": "custom",
+      "refersTo": "score-bar",
+      "description": "0–100 score drawn through the five-band gap ramp, with quarter ticks.",
+      "html": "<div class=\"ds-scorebar-row\"><span>적분</span><span class=\"ds-scorebar\"><span class=\"ds-scorebar-fill\" style=\"width:63.7%;background:#EDA58F\"></span><i style=\"left:25%\"></i><i style=\"left:50%\"></i><i style=\"left:75%\"></i></span><b>63.7</b></div>",
+      "css": ".ds-scorebar-row { display: grid; grid-template-columns: 120px 160px 48px; align-items: center; gap: 8px; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 14px; color: #46536A; font-feature-settings: 'tnum' 1; } .ds-scorebar-row b { text-align: right; color: #18233A; font-weight: 600; } .ds-scorebar { position: relative; display: block; height: 8px; overflow: hidden; background: #E9EDEB; } .ds-scorebar-fill { position: absolute; top: 0; bottom: 0; left: 0; transition: width 500ms ease-out; } .ds-scorebar i { position: absolute; top: 0; bottom: 0; width: 1px; background: #FFFFFF; }"
+    },
+    {
+      "name": "Subject Picker Option",
+      "kind": "chip",
+      "refersTo": "subject-chip",
+      "description": "Square radio option bordered in the subject colour; selected fills solid.",
+      "html": "<div class=\"ds-picker\" role=\"radiogroup\"><button class=\"ds-pick\" role=\"radio\" aria-checked=\"true\" style=\"--c:#2459C8\">수학<small>시험 10.20</small></button><button class=\"ds-pick\" role=\"radio\" aria-checked=\"false\" style=\"--c:#127A55\">국어</button><button class=\"ds-pick-new\">+ 새 과목</button></div>",
+      "css": ".ds-picker { display: flex; flex-wrap: wrap; gap: 8px; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; } .ds-pick { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 44px; padding: 6px 12px; border: 2px solid var(--c); border-radius: 0; background: #FFFFFF; color: var(--c); font-size: 14px; font-weight: 700; line-height: 1.25; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-pick small { font-size: 12px; font-weight: 400; color: #5F6B7E; } .ds-pick[aria-checked='true'] { background: var(--c); color: #FFFFFF; } .ds-pick[aria-checked='true'] small { color: rgba(255,255,255,0.85); } .ds-pick:focus-visible, .ds-pick-new:focus-visible { outline: 2px solid #2459C8; outline-offset: 2px; } .ds-pick-new { min-height: 44px; padding: 0 12px; border: 2px dashed #A9B3AF; background: transparent; color: #46536A; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color 150ms, color 150ms; } .ds-pick-new:hover { border-color: #18233A; color: #18233A; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Classroom Timetable (교실 시간표)",
+    "overview": "The whole app is a timetable pinned to a classroom board. A deep navy header band (the colour of a printed timetable's top strip) runs across every screen; below it, white printed sheets sit on a cool grey-green board, separated by 1px ruled lines rather than shadows. The plan itself is a 7-day by 2-period grid, and every planned study block is a solid slab of its subject's colour, so a subject is recognised by colour before its name is read, on every screen.\n\nThe system is dense, flat and numeric. It reads as an objective analysis instrument: tabular figures everywhere, near-square corners, and one fixed 0–100 score ramp in which deeper vermilion means a larger study gap. Interest comes from the timetable's own materials: the navy frame around today's column, hatched rest days, dashed outlines on unsaved suggestions, struck-through and stamped completed blocks, and capacity bars at the foot of each day. It does not come from decoration. Generic white-card-with-shadow dashboards and pastel gamification were explicitly rejected.\n\nMotion is one short beat, and only for what changed: a block that a plan refresh replaced fills in left to right, and a newly completed block gets its check stamp. Nothing animates on first paint, and nothing animates under reduced motion.",
+    "keyCharacteristics": [
+      "Navy shell band, grey-green ground, white sheets, 1px rules; no elevation.",
+      "Eight fixed subject colours assigned by subject creation order and identical across every screen.",
+      "One five-band score ramp (vermilion, deepest = lowest score) for every score in the app.",
+      "Near-square geometry: 0px on sheets, cells and chips; 2px only on interactive controls.",
+      "Pretendard throughout, tabular numerals globally, extra-bold figures for the key numbers.",
+      "Completion is shown as a light tint plus strike-through plus a stamped square check, never by colour alone."
+    ],
+    "rules": [
+      { "name": "The Subject Owns Its Colour Rule", "body": "A subject gets one colour, decided by creation order, and that colour means that subject on every screen. Subject colours never encode score, status or emphasis.", "section": "colors" },
+      { "name": "The One Ramp Rule", "body": "Every score is drawn through the same five-band gap ramp. Text on a ramp swatch is white only on gap-1 and gap-2 (scores under 40); on all others it is navy. Vermilion is reserved for the ramp, which is why no subject colour is vermilion.", "section": "colors" },
+      { "name": "The Tabular Figures Rule", "body": "`font-feature-settings: \"tnum\" 1` is set on body, so every score, hour and date column aligns. Do not turn it off locally.", "section": "typography" },
+      { "name": "The Keep-All Rule", "body": "Korean text uses `word-break: keep-all`. The only exception is the home mini-timetable unit name, which clamps to two lines with `break-all` and ellipsis and carries the full text in `title` and `aria-label`.", "section": "typography" },
+      { "name": "The Ruled Sheet Rule", "body": "Separation is drawn with 1px rules, never with shadow or blur. If two regions need separating, add a rule or a gap of ground.", "section": "elevation" },
+      { "name": "The Navy Today Rule", "body": "Today is marked by a 3px navy frame running from header to capacity row (an outline on mobile and in the mini timetable), a navy header cell with \"오늘\" in Header Chalk, and Today Tint behind the day on compact views.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do put every surface on a paper sheet with a 1px rule border over the ground board, and separate regions with rules or ground gaps.",
+      "Do resolve subject colour through the creation-order map so the same subject is the same colour on input, plan, home and scores.",
+      "Do draw every score with the five-band gap ramp, white text only on the two deepest bands (score < 40).",
+      "Do mark today with the 3px navy frame, navy header cell and \"오늘\", and mark completion with tint + strike-through + rotated check stamp together.",
+      "Do use dashed borders for anything not yet saved or created, and stripes for rest days.",
+      "Do keep text at 12px or larger, figures tabular, and key numbers extra-bold (800).",
+      "Do animate only cells that changed after first paint, with the 420ms fill or 260ms stamp, and disable both under reduced motion.",
+      "Do fold the timetable into day rows below 768px instead of scrolling it sideways."
+    ],
+    "donts": [
+      "Don't add drop shadows, blur or lifted cards; the only box-shadow allowed is an inset subject-colour stroke used as a border.",
+      "Don't round sheets, cells, chips or bars; the 2px radius belongs to fields and buttons only.",
+      "Don't use a subject colour to mean score, status or emphasis, and don't introduce a vermilion subject colour.",
+      "Don't use Interaction Blue as a fill; it is for text links, focus outlines and the caret.",
+      "Don't build pastel, badge or confetti gamification, or generic white-card dashboards.",
+      "Don't signal completion by colour change alone.",
+      "Don't add a second typeface or turn off tabular numerals."
+    ]
+  }
+}

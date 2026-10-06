@@ -9,3 +9,7 @@ npm-debug.log*
 next-env.d.ts
 .vercel
 .claude
+
+# Impeccable review captures (local only)
+.impeccable/review/
+.impeccable/questions/
