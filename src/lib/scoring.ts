@@ -148,7 +148,8 @@ function volumeTieBreak(problemsTotal: number): number {
 function examPenalty(examDate: string | null, todayISOStr: string): number {
   if (!examDate) return 0;
   const daysUntil = diffInDays(examDate, todayISOStr);
-  if (daysUntil > 30) return 0;
+  // 이미 끝난 시험은 감점하지 않는다 (예전에는 음수가 0으로 잘려 최대 감점 15점이 붙었음)
+  if (daysUntil < 0 || daysUntil > 30) return 0;
   const clamped = Math.max(0, Math.min(30, daysUntil));
   // 시험이 가까울수록(0일에 가까울수록) 최대 15점까지 감점
   return ((30 - clamped) / 30) * 15;
@@ -274,7 +275,39 @@ export function buildSubjectPriorities(
 }
 
 // ---------------------------------------------------------------------------
-// 요일별 개인 학습 계획
+// 계획 기간 (8차시: 시험 일정 반영)
+//  - 시험 일정이 없으면 지금처럼 오늘부터 7일
+//  - 앞으로 볼 시험이 있으면 오늘부터 '마지막 시험 전날'까지 (최대 60일)
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_HORIZON_DAYS = 7;
+export const MAX_HORIZON_DAYS = 60;
+
+export interface PlanHorizon {
+  days: number;
+  lastExamDate: string | null; // 앞으로 볼 마지막 시험 날짜 (없으면 null → 기본 7일)
+}
+
+export function planHorizon(subjects: Subject[], todayISOStr: string = todayISO()): PlanHorizon {
+  const upcoming = subjects
+    .map((s) => s.exam_date)
+    .filter((d): d is string => !!d && d > todayISOStr)
+    .sort();
+  if (upcoming.length === 0) return { days: DEFAULT_HORIZON_DAYS, lastExamDate: null };
+
+  const lastExamDate = upcoming[upcoming.length - 1];
+  // 오늘 ~ 마지막 시험 전날: 일수 = 마지막 시험까지 남은 날
+  const days = Math.min(MAX_HORIZON_DAYS, Math.max(1, diffInDays(lastExamDate, todayISOStr)));
+  return { days, lastExamDate };
+}
+
+/** 그날 공부할 수 있는 과목인지: 시험이 없거나, 시험이 그날보다 뒤에 있는 과목 */
+function isStudyableOn(subject: Subject, dateISO: string): boolean {
+  return !subject.exam_date || subject.exam_date > dateISO;
+}
+
+// ---------------------------------------------------------------------------
+// 날짜별 개인 학습 계획
 // ---------------------------------------------------------------------------
 
 export interface PlanDay {
@@ -282,22 +315,28 @@ export interface PlanDay {
   dayLabel: string;
   availableHours: number;
   items: { subjectId: string; subjectName: string; unit: string; score: number }[]; // 하루 최대 2개 추천
+  exams: { subjectId: string; subjectName: string }[]; // 그날 보는 시험
 }
 
+// 같은 단원을 또 넣을 때마다 이만큼 점수를 더해서 비교한다.
+// → 가장 취약한 단원이 앞쪽 날에 먼저, 더 자주 들어가되 다른 단원도 골고루 돈다.
+const REPEAT_WEIGHT = 12;
+
+/**
+ * 날짜마다 그날 기준으로 학습 점수를 다시 계산해 계획을 세운다.
+ *  - 시험이 끝난(그날이 시험일이거나 지난) 과목은 그날부터 빠진다.
+ *  - 시험 임박 감점·최근 학습 감점이 그날 기준으로 바뀌므로, 시험이 다가오는 과목일수록 우선순위가 올라간다.
+ *  - 하루 2칸: (그날 학습 점수 + 이미 배정된 횟수 × REPEAT_WEIGHT)가 가장 낮은 단원부터 고른다.
+ */
 export function buildStudyPlan(
-  subjectPriorities: SubjectPriority[],
+  subjects: Subject[],
+  records: StudyRecord[],
   weeklyAvailability: WeeklyAvailability[],
   todayISOStr: string = todayISO(),
-  horizonDays = 7
+  horizonDays: number = planHorizon(subjects, todayISOStr).days
 ): PlanDay[] {
   const hoursByDay = new Map(weeklyAvailability.map((w) => [w.day_of_week, w.available_hours]));
-
-  // 모든 단원을 학습 점수 오름차순(가장 취약한 것부터)으로 모은다
-  const allUnits = subjectPriorities
-    .flatMap((sp) => sp.units)
-    .sort((a, b) => a.finalScore - b.finalScore);
-
-  const topN = allUnits.slice(0, Math.min(Math.max(allUnits.length, 1), 6));
+  const timesPlanned = new Map<string, number>();
   const days: PlanDay[] = [];
 
   for (let i = 0; i < horizonDays; i++) {
@@ -305,30 +344,41 @@ export function buildStudyPlan(
     const dow = dayOfWeekMonFirst(date);
     const availableHours = hoursByDay.get(dow) ?? 0;
 
-    const items: PlanDay["items"] = [];
-    if (availableHours > 0 && topN.length > 0) {
-      const first = topN[i % topN.length];
-      items.push({
-        subjectId: first.subjectId,
-        subjectName: first.subjectName,
-        unit: first.unit,
-        score: first.finalScore,
-      });
+    const exams = subjects
+      .filter((s) => s.exam_date === date)
+      .map((s) => ({ subjectId: s.id, subjectName: s.name }));
 
-      if (topN.length > 1) {
-        const second = topN[(i + 1) % topN.length];
-        if (second.unit !== first.unit || second.subjectName !== first.subjectName) {
-          items.push({
-            subjectId: second.subjectId,
-            subjectName: second.subjectName,
-            unit: second.unit,
-            score: second.finalScore,
-          });
+    const items: PlanDay["items"] = [];
+    if (availableHours > 0) {
+      const studyable = subjects.filter((s) => isStudyableOn(s, date));
+      const units = buildUnitStatuses(studyable, records, date);
+
+      for (let slot = 0; slot < 2; slot++) {
+        let best: UnitStatus | null = null;
+        let bestWeight = Infinity;
+        for (const u of units) {
+          if (items.some((it) => it.subjectId === u.subjectId && it.unit === u.unit)) continue;
+          const weight = u.finalScore + (timesPlanned.get(`${u.subjectId}::${u.unit}`) ?? 0) * REPEAT_WEIGHT;
+          if (weight < bestWeight) {
+            best = u;
+            bestWeight = weight;
+          }
         }
+        if (!best) break;
+        const key = `${best.subjectId}::${best.unit}`;
+        timesPlanned.set(key, (timesPlanned.get(key) ?? 0) + 1);
+        items.push({
+          subjectId: best.subjectId,
+          subjectName: best.subjectName,
+          unit: best.unit,
+          score: best.finalScore,
+        });
       }
     }
 
-    days.push({ date, dayLabel: DAY_LABELS_FULL[dow], availableHours, items });
+    // 하루 안에서는 더 취약한(점수가 낮은) 단원을 1교시에
+    items.sort((a, b) => a.score - b.score);
+    days.push({ date, dayLabel: DAY_LABELS_FULL[dow], availableHours, items, exams });
   }
 
   return days;

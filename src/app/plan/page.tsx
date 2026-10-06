@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { addDaysISO, dayOfWeekMonFirst, DAY_LABELS_FULL } from "@/lib/scoring";
 import { colorOf } from "@/lib/palette";
@@ -43,10 +44,21 @@ export default function PlanPage() {
     pastDates,
     savePlan,
     toggleItem,
+    horizon,
+    noStudyHours,
   } = data;
+
+  // 계획 기간이 7일보다 길면(시험 일정) 한 주씩 나눠 보여준다
+  const weeks: (typeof planDays)[] = [];
+  for (let i = 0; i < planDays.length; i += 7) weeks.push(planDays.slice(i, i + 7));
+  const [weekIdx, setWeekIdx] = useState(0);
+  const currentWeek = weeks[Math.min(weekIdx, weeks.length - 1)] ?? [];
 
   const upToDate = hasSavedPlan && !planOutdated;
   const weekRange = `${shortDate(planDays[0].date)} – ${shortDate(planDays[planDays.length - 1].date)}`;
+  const periodNote = horizon.lastExamDate
+    ? `마지막 시험 ${shortDate(horizon.lastExamDate)} 전날까지 · ${planDays.length}일`
+    : `시험 일정 없음 · 기본 ${planDays.length}일`;
   // 이행 기록 격자의 날짜 열: 6일 전 ~ 오늘
   const adherenceDates = Array.from({ length: ADHERENCE_DAYS }, (_, i) =>
     addDaysISO(today, i - (ADHERENCE_DAYS - 1))
@@ -56,7 +68,7 @@ export default function PlanPage() {
     <PageFrame>
       <PageHeader
         title="학습 계획"
-        description="학습 점수가 낮은 단원부터, 요일별 공부 가능 시간에 맞춰 7일 계획을 세웁니다."
+        description="학습 점수가 낮은 단원부터, 요일별 공부 가능 시간과 시험 일정에 맞춰 계획을 세웁니다. 시험 일정이 없으면 7일 계획이에요."
       />
 
       <ConfigNotice />
@@ -94,8 +106,14 @@ export default function PlanPage() {
               <div className="sheet-head">
                 <div className="flex flex-col gap-0.5">
                   <h2 id="timetable-title" className="text-[17px] font-bold tracking-tight">
-                    7일 시간표 <span className="ml-1 font-semibold text-ink-muted">{weekRange}</span>
+                    학습 시간표 <span className="ml-1 font-semibold text-ink-muted">{weekRange}</span>
                   </h2>
+                  <p className="text-[13px] text-ink-soft">
+                    {periodNote}{" "}
+                    <Link href="/exams" className="font-semibold text-[#2459C8] hover:underline">
+                      시험 일정 {horizon.lastExamDate ? "바꾸기" : "넣기"}
+                    </Link>
+                  </p>
                   <p className={`text-[13px] ${planOutdated ? "font-semibold text-warn" : "text-ink-muted"}`}>
                     {planError
                       ? "저장되지 않은 추천 계획이에요."
@@ -137,7 +155,43 @@ export default function PlanPage() {
                 </p>
               )}
 
-              <Timetable data={data} />
+              {noStudyHours && (
+                <p className="notice-warn m-5 mb-0">
+                  요일별 공부 가능 시간이 모두 0시간이라 계획 칸이 비어 있어요.{" "}
+                  <Link href="/availability" className="font-semibold underline">
+                    공부 시간 정하기
+                  </Link>
+                </p>
+              )}
+
+              {weeks.length > 1 && (
+                <div role="tablist" aria-label="주 선택" className="flex gap-1 overflow-x-auto px-5 pt-5">
+                  {weeks.map((w, i) => {
+                    const active = i === Math.min(weekIdx, weeks.length - 1);
+                    const examCount = w.reduce((n, d) => n + d.exams.length, 0);
+                    return (
+                      <button
+                        key={w[0].date}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setWeekIdx(i)}
+                        className={`flex shrink-0 flex-col items-start border px-3 py-1.5 text-left transition-colors ${
+                          active ? "border-shell bg-shell text-white" : "border-rule-strong bg-sheet hover:border-ink"
+                        }`}
+                      >
+                        <span className="text-[13px] font-bold">{i + 1}주차</span>
+                        <span className={`text-[12px] ${active ? "text-shell-text" : "text-ink-muted"}`}>
+                          {shortDate(w[0].date)} – {shortDate(w[w.length - 1].date)}
+                          {examCount > 0 && ` · 시험 ${examCount}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Timetable key={currentWeek[0]?.date} data={data} days={currentWeek} />
 
               {message && (
                 <p

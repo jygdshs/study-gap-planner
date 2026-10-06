@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import PlanCell from "@/components/PlanCell";
 import { colorOf } from "@/lib/palette";
 import type { PlanDay } from "@/lib/scoring";
@@ -21,9 +22,23 @@ function perItemLabel(hours: number, items: number): string {
 
 const LABEL_COL = 52; // px, 교시 표시 열
 
-export default function Timetable({ data }: { data: PlanData }) {
-  const { planDays, today, savedAt, colors, subjectNameById, toggleItem, isRestDay, settled } = data;
-  const maxHours = Math.max(1, ...planDays.map((d) => d.availableHours));
+/**
+ * days: 이번에 보여줄 날짜들(최대 7일, 한 주). 계획 기간이 길면 plan 화면이 주 단위로 잘라서 넘긴다.
+ * 주를 바꾸면 key가 바뀌어 다시 마운트되고, 그 주의 칸이 다시 차례로 채워진다.
+ */
+export default function Timetable({ data, days }: { data: PlanData; days?: PlanDay[] }) {
+  const { today, savedAt, colors, subjectNameById, toggleItem, isRestDay } = data;
+  const planDays = days ?? data.planDays.slice(0, 7);
+  const maxHours = Math.max(1, ...data.planDays.map((d) => d.availableHours));
+
+  // 처음 그려진 직후 한 프레임 뒤에 true → 그 뒤 새로 생긴 칸은 시간차 없이 채워진다
+  const settled = useRef(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      settled.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
   const todayIdx = planDays.findIndex((d) => d.date === today);
 
   // 처음 들어올 때: 요일(열) 순서대로, 같은 요일 안에서는 교시 순서대로 시간차를 두고 채운다.
@@ -111,7 +126,7 @@ export default function Timetable({ data }: { data: PlanData }) {
         <div className="relative">
           <div
             className="grid gap-px border border-rule bg-rule"
-            style={{ gridTemplateColumns: `${LABEL_COL}px repeat(7, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: `${LABEL_COL}px repeat(${planDays.length}, minmax(0, 1fr))` }}
           >
             <div className="bg-sheet" />
             {planDays.map((day) => {
@@ -125,6 +140,15 @@ export default function Timetable({ data }: { data: PlanData }) {
                   <span className={`text-[12px] lg:text-[13px] ${isToday ? "font-semibold text-shell-text" : "text-ink-muted"}`}>
                     {isToday ? "오늘" : shortDate(day.date)}
                   </span>
+                  {day.exams.map((ex) => (
+                    <span
+                      key={ex.subjectId}
+                      className="mt-0.5 max-w-full truncate px-1.5 py-0.5 text-[11px] font-bold text-white lg:text-[12px]"
+                      style={{ backgroundColor: colorOf(colors, ex.subjectId) }}
+                    >
+                      {ex.subjectName} 시험
+                    </span>
+                  ))}
                 </div>
               );
             })}
@@ -173,8 +197,8 @@ export default function Timetable({ data }: { data: PlanData }) {
               aria-hidden
               className="pointer-events-none absolute inset-y-0 border-[3px] border-shell"
               style={{
-                left: `calc(${LABEL_COL + 1}px + ${todayIdx} * ((100% - ${LABEL_COL + 2}px) / 7))`,
-                width: `calc((100% - ${LABEL_COL + 2}px) / 7 + 1px)`,
+                left: `calc(${LABEL_COL + 1}px + ${todayIdx} * ((100% - ${LABEL_COL + 2}px) / ${planDays.length}))`,
+                width: `calc((100% - ${LABEL_COL + 2}px) / ${planDays.length} + 1px)`,
               }}
             />
           )}
@@ -201,6 +225,15 @@ export default function Timetable({ data }: { data: PlanData }) {
                 <span className={`text-[12px] ${isToday ? "font-semibold text-shell-text" : "text-ink-muted"}`}>
                   {isToday ? "오늘" : shortDate(day.date)}
                 </span>
+                {day.exams.map((ex) => (
+                  <span
+                    key={ex.subjectId}
+                    className="mt-1 w-full truncate px-0.5 text-center text-[11px] font-bold text-white"
+                    style={{ backgroundColor: colorOf(colors, ex.subjectId) }}
+                  >
+                    {ex.subjectName}
+                  </span>
+                ))}
               </div>
               <div className="flex flex-col gap-2">
                 {isRestDay(day) ? (

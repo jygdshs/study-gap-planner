@@ -7,6 +7,7 @@ import { TimetableMark } from "@/components/Icons";
 const NAV = [
   { href: "/input", label: "결과 입력" },
   { href: "/availability", label: "공부 시간" },
+  { href: "/exams", label: "시험 일정" },
   { href: "/plan", label: "학습 계획" },
   { href: "/scores", label: "학습 점수" },
 ] as const;

@@ -14,6 +14,7 @@ import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader } from "
 const CYCLE = [
   { href: "/input", label: "결과 입력" },
   { href: "/availability", label: "공부 시간" },
+  { href: "/exams", label: "시험 일정" },
   { href: "/plan", label: "계획 · 체크" },
   { href: "/scores", label: "학습 점수" },
 ] as const;
@@ -174,7 +175,7 @@ export default function HomePage() {
             </div>
             <div className="p-5">
               <div className="grid grid-cols-7 gap-px border border-rule bg-rule">
-                {planDays.map((day) => {
+                {planDays.slice(0, 7).map((day) => {
                   const isToday = day.date === today;
                   return (
                     <div

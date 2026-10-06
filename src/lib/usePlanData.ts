@@ -3,7 +3,7 @@
 // 학습 계획 화면(/plan)과 처음 화면(/)이 같이 쓰는 데이터 불러오기 + 계획 저장/체크 동작.
 // 계산 자체는 scoring.ts / planTracking.ts가 하고, 여기서는 불러오고 저장하는 일만 한다.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
 import type { PlanItem, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
 import {
@@ -11,6 +11,7 @@ import {
   buildStudyPlan,
   buildSubjectPriorities,
   buildUnitStatuses,
+  planHorizon,
   todayISO,
   type PlanDay,
 } from "@/lib/scoring";
@@ -30,9 +31,6 @@ export function usePlanData() {
   const [planError, setPlanError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-
-  // 처음 그려진 뒤에 새로 생긴 칸만 전환을 주기 위한 표시
-  const settled = useRef(false);
 
   const today = todayISO();
   const pastFrom = addDaysISO(today, -ADHERENCE_DAYS);
@@ -83,18 +81,14 @@ export function usePlanData() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!loading) {
-      const id = requestAnimationFrame(() => {
-        settled.current = true;
-      });
-      return () => cancelAnimationFrame(id);
-    }
-  }, [loading]);
 
-  const unitStatuses = buildUnitStatuses(subjects, records);
-  const subjectPriorities = buildSubjectPriorities(subjects, unitStatuses);
-  const planDays: PlanDay[] = buildStudyPlan(subjectPriorities, availability);
+  // 우선순위는 아직 시험을 보지 않은 과목만 (오늘이 시험일인 과목은 D-DAY로 남김)
+  const activeSubjects = subjects.filter((s) => !s.exam_date || s.exam_date >= today);
+  const unitStatuses = buildUnitStatuses(activeSubjects, records);
+  const subjectPriorities = buildSubjectPriorities(activeSubjects, unitStatuses);
+  const horizon = planHorizon(subjects, today);
+  const planDays: PlanDay[] = buildStudyPlan(subjects, records, availability, today, horizon.days);
+  const noStudyHours = availability.every((w) => !w.available_hours);
   const colors = buildSubjectColorMap(subjects);
   const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
 
@@ -185,12 +179,13 @@ export function usePlanData() {
   return {
     today,
     subjects,
+    horizon,
+    noStudyHours,
     loading,
     error,
     planError,
     saving,
     message,
-    settled,
     subjectPriorities,
     planDays,
     colors,
