@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { describeAuthError } from "@/lib/auth";
+import { describeAuthError, USERNAME_MAX, validateUsername } from "@/lib/auth";
 import { ConfigNotice, PageFrame, PageHeader } from "@/components/ui";
 
 // 8차시: 이메일 + 비밀번호 로그인 / 회원가입.
@@ -13,6 +13,7 @@ type Mode = "signin" | "signup";
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [passwordCheck, setPasswordCheck] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,6 +34,11 @@ export default function LoginPage() {
       return;
     }
     if (mode === "signup") {
+      const usernameError = validateUsername(username);
+      if (usernameError) {
+        setMessage({ type: "error", text: usernameError });
+        return;
+      }
       if (password.length < 6) {
         setMessage({ type: "error", text: "비밀번호는 6자 이상이어야 해요." });
         return;
@@ -54,7 +60,8 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: window.location.origin },
+      // 아이디는 계정 정보(user_metadata)에 함께 저장 → 상단 메뉴에 이메일 대신 표시
+      options: { emailRedirectTo: window.location.origin, data: { username: username.trim() } },
     });
     setBusy(false);
     if (error) {
@@ -125,6 +132,23 @@ export default function LoginPage() {
               className="field"
             />
           </label>
+
+          {mode === "signup" && (
+            <label className="flex flex-col gap-2">
+              <span className="field-label">
+                아이디 <span className="font-normal text-ink-muted">상단에 표시돼요 · 2~{USERNAME_MAX}자</span>
+              </span>
+              <input
+                type="text"
+                autoComplete="nickname"
+                value={username}
+                maxLength={USERNAME_MAX}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="예: 공부왕2511"
+                className="field"
+              />
+            </label>
+          )}
 
           <label className="flex flex-col gap-2">
             <span className="field-label">

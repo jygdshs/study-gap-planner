@@ -45,6 +45,14 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+export function UserIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 20.5c1.2-3.6 4.1-5.5 7.5-5.5s6.3 1.9 7.5 5.5" />
+    </Svg>
+  );
+}
+
 export function SunIcon(props: IconProps) {
   return (
     <Svg {...props}>

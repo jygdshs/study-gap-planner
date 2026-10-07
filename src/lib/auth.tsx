@@ -12,15 +12,35 @@ interface AuthState {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /** 화면에 보여줄 아이디. 아직 정하지 않았으면 이메일 @ 앞부분 */
+  displayName: string;
+  /** 아이디를 직접 정했는지 (false면 이메일 앞부분을 대신 쓰는 중) */
+  hasUsername: boolean;
   signOut: () => Promise<void>;
+  /** 아이디 변경. 실패하면 화면용 오류 문구를 돌려준다 */
+  updateUsername: (username: string) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthState>({
   session: null,
   user: null,
   loading: true,
+  displayName: "",
+  hasUsername: false,
   signOut: async () => {},
+  updateUsername: async () => null,
 });
+
+// 아이디 규칙: 화면 표시용이라 다른 사람과 같아도 된다. 앞뒤 공백 제거 후 2~20자.
+export const USERNAME_MIN = 2;
+export const USERNAME_MAX = 20;
+
+export function validateUsername(raw: string): string | null {
+  const name = raw.trim();
+  if (name.length < USERNAME_MIN) return `아이디는 ${USERNAME_MIN}자 이상이어야 해요.`;
+  if (name.length > USERNAME_MAX) return `아이디는 ${USERNAME_MAX}자 이하여야 해요.`;
+  return null;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,8 +63,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  // 아이디는 Supabase 계정 정보(user_metadata.username)에 저장한다.
+  // 화면 표시용이므로 권한 판단에는 절대 쓰지 않는다 (user_metadata는 사용자가 바꿀 수 있는 값).
+  const user = session?.user ?? null;
+  const stored =
+    typeof user?.user_metadata?.username === "string" ? user.user_metadata.username.trim() : "";
+  const hasUsername = stored.length > 0;
+  const displayName = hasUsername ? stored : (user?.email?.split("@")[0] ?? "");
+
+  const updateUsername = async (raw: string): Promise<string | null> => {
+    const invalid = validateUsername(raw);
+    if (invalid) return invalid;
+    const { error } = await supabase.auth.updateUser({ data: { username: raw.trim() } });
+    // 성공하면 onAuthStateChange(USER_UPDATED)로 세션이 갱신돼 상단 표시도 바로 바뀐다
+    return error ? describeAuthError(error.message) : null;
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
+    <AuthContext.Provider
+      value={{ session, user, loading, displayName, hasUsername, signOut, updateUsername }}
+    >
       {children}
     </AuthContext.Provider>
   );

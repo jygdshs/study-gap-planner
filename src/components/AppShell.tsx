@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { TimetableMark } from "@/components/Icons";
+import { TimetableMark, UserIcon } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -20,7 +20,7 @@ const LOGIN_PATH = "/login";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, user, loading, signOut } = useAuth();
+  const { session, user, loading, signOut, displayName } = useAuth();
   const onLogin = pathname === LOGIN_PATH;
 
   // 8차시: 로그인하지 않았으면 로그인 화면으로, 로그인했는데 로그인 화면이면 처음 화면으로
@@ -35,14 +35,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const account = session && (
     <div className="flex items-center gap-3 text-[13px]">
-      <span className="hidden max-w-[180px] truncate text-shell-text lg:inline" title={user?.email ?? ""}>
-        {user?.email}
-      </span>
+      {/* 아이디: 누르면 내 정보(아이디 변경)로. 이메일은 마우스를 올리면 보인다 */}
+      <Link
+        href="/account"
+        aria-current={pathname === "/account" ? "page" : undefined}
+        title={`${user?.email ?? ""} · 내 정보`}
+        className={`flex max-w-[120px] items-center gap-1.5 font-semibold transition-colors hover:text-white sm:max-w-[160px] ${
+          pathname === "/account" ? "text-white" : "text-shell-text"
+        }`}
+      >
+        <UserIcon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{displayName}</span>
+      </Link>
       <button
         type="button"
         onClick={signOut}
-        title={user?.email ? `${user.email} 로그아웃` : "로그아웃"}
-        className="border border-white/25 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/10"
+        className="hidden border border-white/25 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/10 sm:block"
       >
         로그아웃
       </button>
