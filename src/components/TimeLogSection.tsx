@@ -20,9 +20,12 @@ export default function TimeLogSection({ data }: { data: PlanData }) {
   );
 
   const logged = rows.filter((it) => it.actual_minutes != null);
-  const plannedOfLogged = logged.reduce((s, it) => s + (plannedMinutesOf(it) ?? 0), 0);
   const actualOfLogged = logged.reduce((s, it) => s + (it.actual_minutes ?? 0), 0);
-  const ratio = plannedOfLogged > 0 ? Math.round((actualOfLogged / plannedOfLogged) * 100) : null;
+  // 비교는 계획 시간을 아는 칸끼리만 (004 이전에 저장한 지난 칸은 계획 시간이 없다)
+  const comparable = logged.filter((it) => plannedMinutesOf(it) !== null);
+  const plannedOfComparable = comparable.reduce((s, it) => s + (plannedMinutesOf(it) ?? 0), 0);
+  const actualOfComparable = comparable.reduce((s, it) => s + (it.actual_minutes ?? 0), 0);
+  const ratio = plannedOfComparable > 0 ? Math.round((actualOfComparable / plannedOfComparable) * 100) : null;
 
   return (
     <section className="sheet" aria-labelledby="timelog-title">
@@ -48,8 +51,13 @@ export default function TimeLogSection({ data }: { data: PlanData }) {
             ) : (
               <>
                 <span className="text-[14px] text-ink-soft">
-                  계획 <strong className="text-ink">{formatMinutes(plannedOfLogged)}</strong> → 실제{" "}
-                  <strong className="text-[20px] font-extrabold text-ink">{formatMinutes(actualOfLogged)}</strong>
+                  {comparable.length > 0 && (
+                    <>
+                      계획 <strong className="text-ink">{formatMinutes(plannedOfComparable)}</strong> →{" "}
+                    </>
+                  )}
+                  실제{" "}
+                  <strong className="text-[20px] font-extrabold text-ink">{formatMinutes(comparable.length > 0 ? actualOfComparable : actualOfLogged)}</strong>
                 </span>
                 {ratio !== null && (
                   <span
