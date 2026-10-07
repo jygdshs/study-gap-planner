@@ -54,7 +54,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <button
         type="button"
         onClick={signOut}
-        className="hidden border border-white/25 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/10 sm:block"
+        className="hidden border border-white/25 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-white/10 xl:block"
       >
         로그아웃
       </button>
@@ -64,13 +64,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col overflow-x-clip">
       <header className="sticky top-0 z-20 border-b border-white/[0.08] bg-shell text-white">
-        <div className="mx-auto flex max-w-7xl flex-col sm:h-14 sm:flex-row sm:items-stretch sm:justify-between sm:px-6">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-0 sm:py-0">
+        <div className="mx-auto flex max-w-7xl flex-col lg:h-14 lg:flex-row lg:items-stretch lg:justify-between lg:px-6">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-0 lg:py-0">
             <Link href="/" className="flex items-center gap-2.5" aria-label="학습 공백 분석 — 처음 화면">
               <TimetableMark className="h-5 w-5" />
               <span className="whitespace-nowrap text-[15px] font-bold tracking-tight">학습 공백 분석</span>
             </Link>
-            <div className="flex items-center gap-3 sm:hidden">
+            <div className="flex items-center gap-3 lg:hidden">
               {account}
               <ThemeToggle />
             </div>
@@ -78,7 +78,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {session && (
             <div className="flex items-stretch gap-6">
-              <nav aria-label="주 메뉴" className="overflow-x-auto border-t border-shell-line sm:border-t-0">
+              <nav aria-label="주 메뉴" className="overflow-x-auto border-t border-shell-line sm:px-2 lg:border-t-0 lg:px-0">
                 <ul className="flex h-full min-w-max">
                   {NAV.map((item) => {
                     const active = pathname === item.href;
@@ -87,14 +87,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Link
                           href={item.href}
                           aria-current={active ? "page" : undefined}
-                          className={`relative flex items-center px-4 py-3 text-sm font-semibold transition-colors sm:px-3 sm:py-0 lg:px-4 ${
+                          className={`relative flex items-center px-4 py-3 text-sm font-semibold transition-colors lg:px-3 lg:py-0 xl:px-4 ${
                             active ? "text-white" : "text-shell-text hover:text-white"
                           }`}
                         >
                           {item.label}
                           <span
                             aria-hidden
-                            className={`absolute inset-x-4 bottom-0 h-[3px] bg-white transition-transform duration-200 sm:inset-x-3 lg:inset-x-4 ${
+                            className={`absolute inset-x-4 bottom-0 h-[3px] bg-white transition-transform duration-200 lg:inset-x-3 xl:inset-x-4 ${
                               active ? "scale-x-100" : "scale-x-0"
                             }`}
                           />
@@ -104,10 +104,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   })}
                 </ul>
               </nav>
-              <div className="hidden items-center sm:flex">{account}</div>
+              <div className="hidden items-center lg:flex">{account}</div>
             </div>
           )}
-          <div className="hidden items-center pl-4 sm:flex">
+          <div className="hidden items-center pl-4 lg:flex">
             <ThemeToggle />
           </div>
         </div>
