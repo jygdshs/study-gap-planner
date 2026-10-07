@@ -15,6 +15,7 @@
 // 학습 점수는 0~100점이며, "점수가 낮을수록 우선적으로 학습해야 하는 단원/과목"이다.
 
 import type { RecordType, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
+import { keywordScore } from "@/lib/keywords";
 
 // ---------------------------------------------------------------------------
 // 날짜 유틸 (별도 라이브러리 없이 순수 JS Date로 처리)
@@ -87,7 +88,7 @@ export function textSimilarity(a: string, b: string): number {
 
 export interface RecordScore {
   record: StudyRecord;
-  metricLabel: string; // "정답률" | "의미 유사도"
+  metricLabel: string; // "정답률" | "핵심어 일치도"
   metricValue: number; // 0~100
 }
 
@@ -99,12 +100,9 @@ export function scoreOfRecord(record: StudyRecord): RecordScore {
     return { record, metricLabel: "정답률", metricValue: Math.round(value * 10) / 10 };
   }
 
-  const similarity = textSimilarity(record.concept_reference ?? "", record.concept_answer ?? "");
-  return {
-    record,
-    metricLabel: "의미 유사도",
-    metricValue: Math.round(similarity * 1000) / 10,
-  };
+  // 9차시: 개념 의미는 '핵심 단어 일치도'로 채점한다 (src/lib/keywords.ts)
+  const { score } = keywordScore(record.concept_reference ?? "", record.concept_answer ?? "");
+  return { record, metricLabel: "핵심어 일치도", metricValue: score };
 }
 
 // ---------------------------------------------------------------------------

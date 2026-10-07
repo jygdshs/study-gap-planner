@@ -13,25 +13,29 @@ const NAV = [
   { href: "/exams", label: "시험 일정" },
   { href: "/plan", label: "학습 계획" },
   { href: "/scores", label: "학습 점수" },
+  { href: "/report", label: "주간 리포트" },
 ] as const;
 
 const LOGIN_PATH = "/login";
+const RESET_PATH = "/reset-password";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, user, loading, signOut, displayName } = useAuth();
   const onLogin = pathname === LOGIN_PATH;
+  // 9차시: 비밀번호 재설정 화면은 로그인 여부와 상관없이 연다 (링크가 만료되면 그 화면이 안내한다)
+  const onReset = pathname === RESET_PATH;
 
   // 8차시: 로그인하지 않았으면 로그인 화면으로, 로그인했는데 로그인 화면이면 처음 화면으로
   useEffect(() => {
-    if (loading) return;
+    if (loading || onReset) return;
     if (!session && !onLogin) router.replace(LOGIN_PATH);
     if (session && onLogin) router.replace("/");
-  }, [loading, session, onLogin, router]);
+  }, [loading, session, onLogin, onReset, router]);
 
   // 로그인 여부를 확인하는 동안(또는 이동하는 동안)에는 데이터 화면을 그리지 않는다
-  const ready = !loading && (session ? !onLogin : onLogin);
+  const ready = !loading && (onReset || (session ? !onLogin : onLogin));
 
   const account = session && (
     <div className="flex items-center gap-3 text-[13px]">

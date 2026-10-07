@@ -28,6 +28,7 @@ export default function HomePage() {
     subjects,
     planDays,
     savedAt,
+    minutesFor,
     colors,
     subjectNameById,
     toggleItem,
@@ -117,6 +118,7 @@ export default function HomePage() {
                       <PlanCell
                         key={`${slot}-${saved.id}`}
                         kind="saved"
+                        minutes={minutesFor(todayPlan)[slot]}
                         color={colorOf(colors, saved.subject_id)}
                         subjectName={subjectNameById.get(saved.subject_id) ?? "?"}
                         unit={saved.unit}
@@ -131,6 +133,7 @@ export default function HomePage() {
                     <PlanCell
                       key={`${slot}-rec`}
                       kind="suggested"
+                      minutes={minutesFor(todayPlan)[slot]}
                       color={colorOf(colors, rec.subjectId)}
                       subjectName={rec.subjectName}
                       unit={rec.unit}

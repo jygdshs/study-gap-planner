@@ -9,16 +9,9 @@ import type { PlanData } from "@/lib/usePlanData";
 // 7일 × 2교시 시간표. 넓은 화면은 격자, 좁은 화면은 요일별 행.
 //  - 오늘 열은 머리부터 시간 줄까지 하나로 이어진 진남색 틀
 //  - 쉬는 날은 두 교시를 합친 빗금 칸
-//  - 각 열 바닥: 공부 가능 시간 용량 막대(칸에 배정된 과목 색으로 나눠 채움)
+//  - 각 열 바닥: 공부 가능 시간 용량 막대(칸에 배정된 시간 비율대로 과목 색으로 나눠 채움)
 
 const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
-
-/** 하루 공부 가능 시간을 계획 칸 수로 나눈 시간 */
-function perItemLabel(hours: number, items: number): string {
-  if (items === 0 || hours === 0) return "";
-  const minutes = Math.round((hours * 60) / items);
-  return minutes % 60 === 0 ? `칸당 ${minutes / 60}시간` : `칸당 ${minutes}분`;
-}
 
 const LABEL_COL = 52; // px, 교시 표시 열
 
@@ -27,7 +20,7 @@ const LABEL_COL = 52; // px, 교시 표시 열
  * 주를 바꾸면 key가 바뀌어 다시 마운트되고, 그 주의 칸이 다시 차례로 채워진다.
  */
 export default function Timetable({ data, days }: { data: PlanData; days?: PlanDay[] }) {
-  const { today, savedAt, colors, subjectNameById, toggleItem, isRestDay } = data;
+  const { today, savedAt, colors, subjectNameById, toggleItem, isRestDay, minutesFor } = data;
   const planDays = days ?? data.planDays.slice(0, 7);
   const maxHours = Math.max(1, ...data.planDays.map((d) => d.availableHours));
 
@@ -49,6 +42,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
   const renderCell = (day: PlanDay, slot: number, compact = false) => {
     const animate = true;
     const delay = delayFor(planDays.indexOf(day), slot);
+    const minutes = minutesFor(day)[slot];
     const saved = savedAt(day.date, slot);
     if (saved) {
       return (
@@ -58,6 +52,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           compact={compact}
           animate={animate}
           delay={delay}
+          minutes={minutes}
           color={colorOf(colors, saved.subject_id)}
           subjectName={subjectNameById.get(saved.subject_id) ?? "?"}
           unit={saved.unit}
@@ -76,6 +71,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           compact={compact}
           animate={animate}
           delay={delay}
+          minutes={minutes}
           color={colorOf(colors, rec.subjectId)}
           subjectName={rec.subjectName}
           unit={rec.unit}
@@ -85,19 +81,20 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
     return <PlanCell key={`${slot}-empty`} kind="empty" compact={compact} />;
   };
 
-  /** 그날 칸에 배정된 과목 색 (용량 막대 채움용) */
-  const dayColors = (day: PlanDay): string[] =>
-    [0, 1]
+  /** 그날 칸에 배정된 과목 색과 시간(분) — 용량 막대를 배정 시간 비율대로 나눠 채운다 */
+  const dayFills = (day: PlanDay): { color: string; minutes: number }[] => {
+    const minutes = minutesFor(day);
+    return [0, 1]
       .map((slot) => {
         const saved = savedAt(day.date, slot);
-        if (saved) return colorOf(colors, saved.subject_id);
-        const rec = day.items[slot];
-        return rec ? colorOf(colors, rec.subjectId) : null;
+        const subjectId = saved?.subject_id ?? day.items[slot]?.subjectId;
+        return subjectId ? { color: colorOf(colors, subjectId), minutes: minutes[slot] ?? 0 } : null;
       })
-      .filter((c): c is string => c !== null);
+      .filter((f): f is { color: string; minutes: number } => f !== null);
+  };
 
   const renderCapacity = (day: PlanDay) => {
-    const fills = dayColors(day);
+    const fills = dayFills(day);
     const barDelay = settled.current ? 0 : 420 + planDays.indexOf(day) * 70;
     return (
       <div className="flex flex-col gap-1.5">
@@ -106,14 +103,13 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
             className="bar-grow flex h-full"
             style={{ width: `${(day.availableHours / maxHours) * 100}%`, animationDelay: `${barDelay}ms` }}
           >
-            {fills.map((c, i) => (
-              <span key={i} className="h-full flex-1" style={{ backgroundColor: c }} />
+            {fills.map((f, i) => (
+              <span key={i} className="h-full" style={{ backgroundColor: f.color, flexGrow: Math.max(1, f.minutes) }} />
             ))}
           </div>
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-[12px] leading-tight text-ink-muted lg:text-[13px]">
           <span className="whitespace-nowrap font-bold text-ink-soft">{day.availableHours}시간</span>
-          <span className="whitespace-nowrap">{perItemLabel(day.availableHours, fills.length)}</span>
         </div>
       </div>
     );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckIcon } from "@/components/Icons";
 import { completedFill, subjectInk } from "@/lib/palette";
+import { formatMinutes } from "@/lib/allocation";
 
 // 시간표 한 칸. 계획 블록 = 과목 색 단색 블록.
 //  - saved: 저장된 계획. 오늘까지의 칸은 칸 전체를 눌러 완료 체크한다.
@@ -14,7 +15,8 @@ import { completedFill, subjectInk } from "@/lib/palette";
 // delay로 요일·교시마다 시간차를 줘서 시간표가 차례로 채워지는 것처럼 보이게 한다.
 // 이미 있던 칸은 다시 그려져도 전환이 반복되지 않고, 새로 완료한 칸만 도장이 찍힌다.
 
-type Common = { compact?: boolean; animate?: boolean; delay?: number };
+// minutes: 9차시 점수에 따른 시간 배분 — 이 칸에 배정된 공부 시간(분)
+type Common = { compact?: boolean; animate?: boolean; delay?: number; minutes?: number | null };
 
 type Props = Common &
   (
@@ -41,6 +43,10 @@ export default function PlanCell(props: Props) {
   const minH = props.compact ? "min-h-[56px]" : "min-h-[84px] lg:min-h-[96px]";
   const fill = fillOnMount ? "cell-fill" : "";
   const motion = fillOnMount ? { animationDelay: `${delayOnMount}ms` } : undefined;
+  const timeLabel =
+    props.minutes && props.minutes > 0 ? (
+      <span className="font-medium opacity-90"> · {formatMinutes(props.minutes)}</span>
+    ) : null;
   const subjectText = props.compact ? "text-[12px]" : "text-[12px] lg:text-[13px]";
   const unitText = props.compact ? "text-[14px]" : "text-[14px] lg:text-[16px]";
 
@@ -69,7 +75,10 @@ export default function PlanCell(props: Props) {
         className={`${fill} flex h-full ${minH} flex-col justify-between gap-1 border border-dashed bg-sheet p-2`}
         style={{ ...motion, borderColor: subjectInk(props.color), color: subjectInk(props.color) }}
       >
-        <span className={`${subjectText} font-semibold leading-none`}>{props.subjectName}</span>
+        <span className={`${subjectText} font-semibold leading-none`}>
+          {props.subjectName}
+          {timeLabel}
+        </span>
         <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
       </div>
     );
@@ -80,8 +89,9 @@ export default function PlanCell(props: Props) {
 
   const body = (
     <>
-      <span className={`${subjectText} font-semibold leading-none ${completed ? "" : "text-white/85"}`}>
+      <span className={`pr-7 ${subjectText} font-semibold leading-none ${completed ? "" : "text-white/85"}`}>
         {subjectName}
+        {timeLabel}
       </span>
       <span
         className={`pr-6 ${unitText} font-bold leading-snug ${

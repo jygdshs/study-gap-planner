@@ -17,6 +17,7 @@ import {
 } from "@/lib/scoring";
 import { diffPlanForSave, findPendingResultInputs, summarizeAdherence } from "@/lib/planTracking";
 import { buildSubjectColorMap } from "@/lib/palette";
+import { allocateMinutes } from "@/lib/allocation";
 import { useAuth } from "@/lib/auth";
 
 // 이행률을 계산할 기간: 오늘 포함 최근 7일
@@ -101,6 +102,25 @@ export function usePlanData() {
   }
   const savedAt = (date: string, slot: number) =>
     planError ? undefined : itemsByDate.get(date)?.find((it) => it.slot === slot);
+
+  // 9차시: 점수에 따른 시간 배분 — 그날 칸들(저장된 칸 우선, 없으면 추천 칸)의 학습 점수로 하루 시간을 나눈다
+  const todayScoreByUnit = new Map(unitStatuses.map((u) => [`${u.subjectId}::${u.unit}`, u.finalScore]));
+  /** 그날 [1교시, 2교시] 배정 시간(분). 칸이 없으면 null */
+  const minutesFor = (day: PlanDay): (number | null)[] => {
+    const cells = [0, 1].map((slot) => {
+      const saved = savedAt(day.date, slot);
+      const subjectId = saved?.subject_id ?? day.items[slot]?.subjectId;
+      const unit = saved?.unit ?? day.items[slot]?.unit;
+      if (!subjectId || !unit) return null;
+      // 그날 기준 점수(추천에 있으면 그 값) → 없으면 오늘 기준 점수 → 그래도 없으면 중간값
+      const rec = day.items.find((it) => it.subjectId === subjectId && it.unit === unit);
+      return rec?.score ?? todayScoreByUnit.get(`${subjectId}::${unit}`) ?? 50;
+    });
+    const present = cells.filter((s): s is number => s !== null);
+    const minutes = allocateMinutes(day.availableHours, present);
+    let k = 0;
+    return cells.map((s) => (s === null ? null : minutes[k++]));
+  };
 
   const futureSaved = planItems.filter((it) => it.plan_date >= today);
   const { upserts, deleteIds } = diffPlanForSave(planDays, futureSaved);
@@ -197,6 +217,7 @@ export function usePlanData() {
     subjectNameById,
     itemsByDate,
     savedAt,
+    minutesFor,
     hasSavedPlan,
     planOutdated,
     adherence,

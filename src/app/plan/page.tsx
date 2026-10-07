@@ -68,7 +68,7 @@ export default function PlanPage() {
     <PageFrame>
       <PageHeader
         title="학습 계획"
-        description="학습 점수가 낮은 단원부터, 요일별 공부 가능 시간과 시험 일정에 맞춰 계획을 세웁니다. 시험 일정이 없으면 7일 계획이에요."
+        description="학습 점수가 낮은 단원부터, 요일별 공부 가능 시간과 시험 일정에 맞춰 계획을 세웁니다. 하루 시간은 점수가 낮은 단원에 더 길게 나눠요."
       />
 
       <ConfigNotice />

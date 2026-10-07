@@ -8,7 +8,8 @@ import { ConfigNotice, PageFrame, PageHeader } from "@/components/ui";
 // 8차시: 이메일 + 비밀번호 로그인 / 회원가입.
 // 로그인에 성공하면 AppShell이 처음 화면으로 보낸다.
 
-type Mode = "signin" | "signup";
+// forgot: 9차시 비밀번호 찾기 — 이메일로 재설정 링크를 보낸다 (링크 → /reset-password)
+type Mode = "signin" | "signup" | "forgot";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
@@ -28,6 +29,28 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+
+    if (mode === "forgot") {
+      if (!email.trim()) {
+        setMessage({ type: "error", text: "가입한 이메일을 입력해 주세요." });
+        return;
+      }
+      setBusy(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setBusy(false);
+      if (error) {
+        setMessage({ type: "error", text: describeAuthError(error.message) });
+        return;
+      }
+      // 가입 여부를 알려주지 않도록 항상 같은 안내를 보여준다
+      setMessage({
+        type: "ok",
+        text: `${email.trim()} 으로 가입돼 있다면 비밀번호 재설정 메일이 가요. 메일의 링크를 눌러 새 비밀번호를 정하세요.`,
+      });
+      return;
+    }
 
     if (!email.trim() || !password) {
       setMessage({ type: "error", text: "이메일과 비밀번호를 입력해 주세요." });
@@ -83,12 +106,15 @@ export default function LoginPage() {
   return (
     <PageFrame>
       <PageHeader
-        title={mode === "signin" ? "로그인" : "회원가입"}
+        title={mode === "signin" ? "로그인" : mode === "signup" ? "회원가입" : "비밀번호 찾기"}
         description="같은 계정으로 로그인하면 휴대폰·노트북 어디서든 같은 학습 기록과 계획을 볼 수 있어요."
       />
       <ConfigNotice />
 
-      <section className="sheet w-full max-w-md" aria-label={mode === "signin" ? "로그인" : "회원가입"}>
+      <section
+        className="sheet w-full max-w-md"
+        aria-label={mode === "signin" ? "로그인" : mode === "signup" ? "회원가입" : "비밀번호 찾기"}
+      >
         <div role="tablist" aria-label="로그인 또는 회원가입" className="grid grid-cols-2 border-b border-rule">
           {(
             [
@@ -150,18 +176,24 @@ export default function LoginPage() {
             </label>
           )}
 
-          <label className="flex flex-col gap-2">
-            <span className="field-label">
-              비밀번호 {mode === "signup" && <span className="font-normal text-ink-muted">6자 이상</span>}
-            </span>
-            <input
-              type="password"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="field"
-            />
-          </label>
+          {mode === "forgot" ? (
+            <p className="text-[13px] leading-relaxed text-ink-muted">
+              가입한 이메일로 비밀번호를 새로 정할 수 있는 링크를 보내 드려요.
+            </p>
+          ) : (
+            <label className="flex flex-col gap-2">
+              <span className="field-label">
+                비밀번호 {mode === "signup" && <span className="font-normal text-ink-muted">6자 이상</span>}
+              </span>
+              <input
+                type="password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="field"
+              />
+            </label>
+          )}
 
           {mode === "signup" && (
             <label className="flex flex-col gap-2">
@@ -186,19 +218,48 @@ export default function LoginPage() {
           )}
 
           <button type="submit" disabled={busy} className="btn-primary py-3.5 text-[15px]">
-            {busy ? "처리 중…" : mode === "signin" ? "로그인" : "가입하기"}
+            {busy
+              ? "처리 중…"
+              : mode === "signin"
+                ? "로그인"
+                : mode === "signup"
+                  ? "가입하기"
+                  : "재설정 메일 보내기"}
           </button>
 
-          <p className="text-center text-[13px] text-ink-muted">
-            {mode === "signin" ? "처음이세요? " : "이미 계정이 있나요? "}
-            <button
-              type="button"
-              onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
-              className="font-semibold text-accent hover:underline"
-            >
-              {mode === "signin" ? "회원가입" : "로그인"}
-            </button>
-          </p>
+          {mode === "forgot" ? (
+            <p className="text-center text-[13px] text-ink-muted">
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="font-semibold text-accent hover:underline"
+              >
+                로그인으로 돌아가기
+              </button>
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-[13px] text-ink-muted">
+              <span>
+                {mode === "signin" ? "처음이세요? " : "이미 계정이 있나요? "}
+                <button
+                  type="button"
+                  onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
+                  className="font-semibold text-accent hover:underline"
+                >
+                  {mode === "signin" ? "회원가입" : "로그인"}
+                </button>
+              </span>
+              {mode === "signin" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="font-semibold text-accent hover:underline"
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+              )}
+            </p>
+          )}
         </form>
       </section>
     </PageFrame>

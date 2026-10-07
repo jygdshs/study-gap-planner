@@ -30,6 +30,11 @@ export default function ExamsPage() {
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [newName, setNewName] = useState("");
   const [newDate, setNewDate] = useState("");
+  // 9차시: 과목 이름 수정·삭제
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const today = todayISO();
 
@@ -92,6 +97,54 @@ export default function ExamsPage() {
     await load();
   };
 
+  const startEdit = (s: Subject) => {
+    setEditingId(s.id);
+    setEditName(s.name);
+    setConfirmDelete(false);
+    setMessage(null);
+  };
+
+  const handleRename = async (s: Subject) => {
+    const name = editName.trim();
+    if (!name) {
+      setMessage({ type: "error", text: "과목 이름을 입력해 주세요." });
+      return;
+    }
+    if (name === s.name) {
+      setEditingId(null);
+      return;
+    }
+    setBusyId(s.id);
+    const { error } = await supabase.from("subjects").update({ name }).eq("id", s.id);
+    setBusyId(null);
+    if (error) {
+      setMessage({
+        type: "error",
+        text: error.message.includes("duplicate")
+          ? "같은 이름의 과목이 이미 있어요."
+          : `이름 변경 실패: ${error.message}`,
+      });
+      return;
+    }
+    setEditingId(null);
+    await load();
+    setMessage({ type: "ok", text: `과목 이름을 ‘${name}’(으)로 바꿨어요.` });
+  };
+
+  const handleDelete = async (s: Subject) => {
+    setBusyId(s.id);
+    // 기록·계획 칸은 DB에서 함께 지워진다 (subject_id on delete cascade)
+    const { error } = await supabase.from("subjects").delete().eq("id", s.id);
+    setBusyId(null);
+    if (error) {
+      setMessage({ type: "error", text: `과목 삭제 실패: ${error.message}` });
+      return;
+    }
+    setEditingId(null);
+    await load();
+    setMessage({ type: "ok", text: `‘${s.name}’ 과목과 그 기록·계획을 지웠어요.` });
+  };
+
   // 달력: 오늘이 있는 주 월요일부터 마지막 시험이 있는 주 일요일까지
   const calendarEnd = horizon.lastExamDate ?? lastPlanDay;
   const calStart = addDaysISO(today, -dayOfWeekMonFirst(today));
@@ -145,6 +198,15 @@ export default function ExamsPage() {
                       <span className="flex min-w-0 items-center gap-2">
                         <SubjectChip color={colorOf(colors, s.id)} />
                         <span className="truncate text-[16px] font-bold">{s.name}</span>
+                        {editingId !== s.id && (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(s)}
+                            className="shrink-0 border border-rule-strong px-1.5 py-px text-[12px] font-semibold text-ink-soft hover:border-ink hover:text-ink"
+                          >
+                            편집
+                          </button>
+                        )}
                       </span>
                       <span className="flex items-center gap-1 sm:order-none">
                         <input
@@ -181,6 +243,68 @@ export default function ExamsPage() {
                               ? "오늘 시험"
                               : `D-${dday}`}
                       </span>
+
+                      {editingId === s.id && (
+                        <div className="col-span-full mt-2 flex flex-col gap-2 border border-rule bg-sheet-alt p-3">
+                          <div className="flex gap-2">
+                            <input
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleRename(s)}
+                              aria-label="과목 이름"
+                              className="field py-2 text-[14px]"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRename(s)}
+                              disabled={busyId === s.id}
+                              className="btn-primary shrink-0 py-2"
+                            >
+                              이름 저장
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="btn-quiet shrink-0 py-2"
+                            >
+                              닫기
+                            </button>
+                          </div>
+                          {confirmDelete ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 border border-danger/40 px-3 py-2 text-[13px]">
+                              <span>
+                                ‘{s.name}’과 이 과목의 <strong>학습 기록·계획 칸이 모두</strong> 지워져요.
+                              </span>
+                              <span className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(s)}
+                                  disabled={busyId === s.id}
+                                  className="bg-danger px-2.5 py-1 text-[12px] font-bold text-sheet disabled:opacity-60"
+                                >
+                                  {busyId === s.id ? "삭제 중…" : "모두 삭제"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDelete(false)}
+                                  className="border border-rule-strong px-2.5 py-1 text-[12px] font-semibold"
+                                >
+                                  취소
+                                </button>
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDelete(true)}
+                              className="self-start text-[12px] font-semibold text-danger hover:underline"
+                            >
+                              과목 삭제…
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { textSimilarity, todayISO } from "@/lib/scoring";
+import { todayISO } from "@/lib/scoring";
+import { keywordScore } from "@/lib/keywords";
+import KeywordMatches from "@/components/KeywordMatches";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
 import { ArrowRightIcon } from "@/components/Icons";
@@ -15,7 +17,7 @@ import type { RecordType } from "@/types/study";
 
 const TYPE_OPTIONS: { value: RecordType; label: string; hint: string }[] = [
   { value: "problem", label: "문제 풀이", hint: "정답률로 채점" },
-  { value: "concept", label: "개념 의미", hint: "기준 의미와 유사도로 채점" },
+  { value: "concept", label: "개념 의미", hint: "기준 의미의 핵심어로 채점" },
 ];
 
 export default function InputPage() {
@@ -124,16 +126,18 @@ export default function InputPage() {
   // 저장 전 미리보기: 이 기록 하나의 기본 점수(감점 전). scoring.ts와 같은 계산.
   const total = Number(problemsTotal);
   const correct = Number(problemsCorrect);
+  // 9차시: 개념 의미는 핵심어 일치도로 채점 — 맞춘/빠진 핵심어도 함께 보여준다
+  const conceptPreview =
+    recordType === "concept" && conceptReference.trim() && conceptAnswer.trim()
+      ? keywordScore(conceptReference, conceptAnswer)
+      : null;
   const preview: { label: string; value: number } | null =
     recordType === "problem"
       ? problemsTotal !== "" && problemsCorrect !== "" && total > 0 && correct <= total
         ? { label: "정답률", value: Math.round((correct / total) * 1000) / 10 }
         : null
-      : conceptReference.trim() && conceptAnswer.trim()
-        ? {
-            label: "의미 유사도",
-            value: Math.round(textSimilarity(conceptReference, conceptAnswer) * 1000) / 10,
-          }
+      : conceptPreview
+        ? { label: "핵심어 일치도", value: conceptPreview.score }
         : null;
 
   const countFields = [
@@ -296,6 +300,7 @@ export default function InputPage() {
                 </span>
               </div>
               <ScoreBar score={preview?.value ?? 0} />
+              {conceptPreview && <KeywordMatches matches={conceptPreview.matches} />}
             </div>
 
             {message && (
