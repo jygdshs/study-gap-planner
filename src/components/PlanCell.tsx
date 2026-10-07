@@ -43,9 +43,15 @@ export default function PlanCell(props: Props) {
   const minH = props.compact ? "min-h-[56px]" : "min-h-[84px] lg:min-h-[96px]";
   const fill = fillOnMount ? "cell-fill" : "";
   const motion = fillOnMount ? { animationDelay: `${delayOnMount}ms` } : undefined;
+  // 배정 시간은 좁은 칸에서도 한 줄에 들어가게 분 단위로 짧게 (70분), 마우스를 올리면 1시간 10분
   const timeLabel =
     props.minutes && props.minutes > 0 ? (
-      <span className="font-medium opacity-90"> · {formatMinutes(props.minutes)}</span>
+      <span
+        className="text-[12px] font-semibold leading-none tabular-nums opacity-90"
+        title={`배정 시간 ${formatMinutes(props.minutes)}`}
+      >
+        {props.minutes}분
+      </span>
     ) : null;
   const subjectText = props.compact ? "text-[12px]" : "text-[12px] lg:text-[13px]";
   const unitText = props.compact ? "text-[14px]" : "text-[14px] lg:text-[16px]";
@@ -75,11 +81,11 @@ export default function PlanCell(props: Props) {
         className={`${fill} flex h-full ${minH} flex-col justify-between gap-1 border border-dashed bg-sheet p-2`}
         style={{ ...motion, borderColor: subjectInk(props.color), color: subjectInk(props.color) }}
       >
-        <span className={`${subjectText} font-semibold leading-none`}>
-          {props.subjectName}
+        <span className={`${subjectText} font-semibold leading-none`}>{props.subjectName}</span>
+        <span className="flex flex-col gap-1">
+          <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
           {timeLabel}
         </span>
-        <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
       </div>
     );
   }
@@ -91,14 +97,12 @@ export default function PlanCell(props: Props) {
     <>
       <span className={`pr-7 ${subjectText} font-semibold leading-none ${completed ? "" : "text-white/85"}`}>
         {subjectName}
-        {timeLabel}
       </span>
-      <span
-        className={`pr-6 ${unitText} font-bold leading-snug ${
-          completed ? "line-through decoration-2" : "text-white"
-        }`}
-      >
-        {unit}
+      <span className={`flex flex-col gap-1 pr-6 ${completed ? "" : "text-white"}`}>
+        <span className={`${unitText} font-bold leading-snug ${completed ? "line-through decoration-2" : ""}`}>
+          {unit}
+        </span>
+        {timeLabel}
       </span>
       {completed ? (
         <span

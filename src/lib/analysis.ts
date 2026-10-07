@@ -160,11 +160,16 @@ export function buildWeeklyReport(
     const before = rs.filter((r) => r.study_date < thisFrom);
     const after = latestOf(during);
     const afterScore = scoreOfRecord(after).metricValue;
-    if (before.length === 0) {
+    // 비교 기준: 이번 주 전 마지막 기록. 없으면 이번 주 첫 기록(이번 주 안에 2번 이상 기록한 경우)
+    const earliestDuring = [...during].sort((a, b) =>
+      a.study_date === b.study_date ? (a.created_at < b.created_at ? -1 : 1) : a.study_date < b.study_date ? -1 : 1
+    )[0];
+    const baseline = before.length > 0 ? latestOf(before) : during.length >= 2 ? earliestDuring : null;
+    if (!baseline) {
       newUnits.push({ subjectId: after.subject_id, unit: after.unit, score: afterScore });
       continue;
     }
-    const beforeScore = scoreOfRecord(latestOf(before)).metricValue;
+    const beforeScore = scoreOfRecord(baseline).metricValue;
     changes.push({
       subjectId: after.subject_id,
       unit: after.unit,

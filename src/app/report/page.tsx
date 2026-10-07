@@ -178,7 +178,7 @@ export default function ReportPage() {
                 <h2 id="units-change-title" className="sheet-title">
                   단원별 변화
                 </h2>
-                <span className="text-xs text-ink-muted">이번 주 전 마지막 기록 → 이번 주 마지막 기록</span>
+                <span className="text-xs text-ink-muted">이전 기록 → 이번 주 마지막 기록</span>
               </div>
               {report.improved.length + report.declined.length + report.newUnits.length === 0 ? (
                 <p className="px-5 py-4 text-[14px] text-ink-muted">이번 주에 기록한 단원이 없어요.</p>
