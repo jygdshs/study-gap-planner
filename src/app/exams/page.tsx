@@ -235,13 +235,15 @@ export default function ExamsPage() {
                           dday === null ? "text-ink-muted" : dday < 0 ? "text-ink-muted" : "text-danger"
                         }`}
                       >
-                        {dday === null
-                          ? "시험 없음"
-                          : dday < 0
-                            ? "시험 끝남 · 계획 제외"
-                            : dday === 0
-                              ? "오늘 시험"
-                              : `D-${dday}`}
+                        {dday === null ? (
+                          "시험 없음"
+                        ) : dday <= 0 ? (
+                          <Link href="/results" className="text-accent hover:underline">
+                            {dday === 0 ? "오늘 시험 · 결과 입력" : "시험 끝남 · 결과 입력"}
+                          </Link>
+                        ) : (
+                          `D-${dday}`
+                        )}
                       </span>
 
                       {editingId === s.id && (

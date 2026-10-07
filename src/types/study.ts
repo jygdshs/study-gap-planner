@@ -41,6 +41,16 @@ export interface WeeklyAvailability {
   updated_at: string;
 }
 
+// 실제 시험 성적 (학습 점수 예측과 비교)
+export interface ExamResult {
+  id: string;
+  subject_id: string;
+  exam_date: string; // YYYY-MM-DD
+  score: number; // 받은 점수
+  max_score: number; // 만점
+  created_at: string;
+}
+
 // 7차시: 저장된 학습 계획 1칸 + 이행 여부
 export interface PlanItem {
   id: string;

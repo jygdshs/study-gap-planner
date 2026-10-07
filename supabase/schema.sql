@@ -4,6 +4,7 @@
 --
 -- ※ 이미 예전 스키마(로그인 없음)로 쓰던 프로젝트라면 이 파일 대신
 --   supabase/migrations/002_auth_per_user.sql 을 실행하세요. (기존 데이터를 내 계정으로 옮김)
+-- ※ 실제 시험 성적 비교(/results)를 쓰려면 이어서 supabase/migrations/003_exam_results.sql 도 실행하세요.
 
 -- 1) 과목 (과목명, 과목별 시험 날짜)
 create table if not exists subjects (

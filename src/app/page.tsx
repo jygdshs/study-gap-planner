@@ -259,6 +259,42 @@ export default function HomePage() {
               showUnits={false}
             />
           </section>
+
+          {/* 복습 퀴즈 · 시험 결과 비교로 가는 길 */}
+          <section className="sheet" aria-labelledby="review-title">
+            <div className="sheet-head">
+              <h2 id="review-title" className="sheet-title">
+                복습과 시험 결과
+              </h2>
+            </div>
+            <ul>
+              {[
+                {
+                  href: "/quiz",
+                  title: "개념 복습 퀴즈",
+                  body: "정리했던 개념을 가린 채 다시 설명하고 핵심어로 채점해요.",
+                },
+                {
+                  href: "/results",
+                  title: "시험 결과 비교",
+                  body: "실제 시험 점수를 넣고 학습 점수가 얼마나 맞았는지 봐요.",
+                },
+              ].map((l) => (
+                <li key={l.href} className="border-b border-rule last:border-b-0">
+                  <Link
+                    href={l.href}
+                    className="group flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-sheet-alt"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[15px] font-bold">{l.title}</span>
+                      <span className="text-[13px] text-ink-soft">{l.body}</span>
+                    </span>
+                    <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </div>
     </PageFrame>

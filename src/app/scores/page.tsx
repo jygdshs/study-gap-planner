@@ -349,7 +349,12 @@ function SelectedUnitPanel({
           </dl>
           {conceptMatches.length > 0 && (
             <div className="flex flex-col gap-2 border-t border-rule pt-3">
-              <h3 className="text-[13px] font-bold">최근 기록의 핵심어</h3>
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="text-[13px] font-bold">최근 기록의 핵심어</h3>
+                <Link href="/quiz" className="text-[13px] font-semibold text-accent hover:underline">
+                  복습 퀴즈로 다시 풀기
+                </Link>
+              </div>
               <KeywordMatches matches={conceptMatches} />
             </div>
           )}
