@@ -8,6 +8,9 @@ import { ADHERENCE_DAYS, usePlanData } from "@/lib/usePlanData";
 import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
 import Timetable from "@/components/Timetable";
+import TimeLogSection from "@/components/TimeLogSection";
+import PlanPrintSheet from "@/components/PlanPrintSheet";
+import { buildExportDays, downloadPlanImage } from "@/lib/exportPlan";
 import { ArrowRightIcon, CheckIcon, RefreshIcon } from "@/components/Icons";
 import {
   ConfigNotice,
@@ -46,7 +49,10 @@ export default function PlanPage() {
     toggleItem,
     horizon,
     noStudyHours,
+    carried,
   } = data;
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // 계획 기간이 7일보다 길면(시험 일정) 한 주씩 나눠 보여준다
   const weeks: (typeof planDays)[] = [];
@@ -60,6 +66,19 @@ export default function PlanPage() {
     ? `마지막 시험 ${shortDate(horizon.lastExamDate)} 전날까지 · ${planDays.length}일`
     : `시험 일정 없음 · 기본 ${planDays.length}일`;
   // 이행 기록 격자의 날짜 열: 6일 전 ~ 오늘
+  const exportTitle = `학습 계획 ${weekRange}`;
+  const exportSubtitle = `${periodNote} · ${shortDate(today)} 기준`;
+  const saveImage = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await downloadPlanImage(buildExportDays(data), exportTitle, exportSubtitle, `학습계획_${planDays[0].date}.png`);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "이미지를 만들지 못했어요.");
+    }
+    setExporting(false);
+  };
+
   const adherenceDates = Array.from({ length: ADHERENCE_DAYS }, (_, i) =>
     addDaysISO(today, i - (ADHERENCE_DAYS - 1))
   );
@@ -119,7 +138,9 @@ export default function PlanPage() {
                       ? "저장되지 않은 추천 계획이에요."
                       : !hasSavedPlan
                         ? "점선 칸은 추천이에요. 저장해야 날마다 체크할 수 있어요."
-                        : planOutdated
+                        : planOutdated && carried.length > 0
+                          ? `지난 날 못 한 ${carried.length}칸을 다음 날로 옮긴 추천이 있어요. 갱신하면 반영돼요.`
+                          : planOutdated
                           ? "새 학습 결과가 반영된 추천이 있어요. 갱신해도 완료한 칸은 남아요."
                           : "오늘까지의 칸은 눌러서 완료 체크하세요."}
                   </p>
@@ -193,6 +214,19 @@ export default function PlanPage() {
 
               <Timetable key={currentWeek[0]?.date} data={data} days={currentWeek} />
 
+              {/* 내보내기: 계획 기간 전체 */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-3">
+                <span className="mr-auto text-[13px] text-ink-muted">계획 {planDays.length}일 전체를 내보내요</span>
+                <button type="button" onClick={saveImage} disabled={exporting} className="btn-quiet">
+                  {exporting ? "만드는 중…" : "이미지로 저장"}
+                </button>
+                <button type="button" onClick={() => window.print()} className="btn-quiet">
+                  인쇄 · PDF
+                </button>
+              </div>
+              {exportError && <p className="notice-error mx-5 mb-5">{exportError}</p>}
+              <PlanPrintSheet days={buildExportDays(data)} title={exportTitle} subtitle={exportSubtitle} />
+
               {message && (
                 <p
                   role="status"
@@ -243,6 +277,8 @@ export default function PlanPage() {
                 </ol>
               </section>
             )}
+
+            {!planError && <TimeLogSection data={data} />}
           </div>
 
           {!planError && (

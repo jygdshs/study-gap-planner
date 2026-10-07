@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
 import type { PlanItem, StudyRecord, Subject } from "@/types/study";
-import { addDaysISO, dayOfWeekMonFirst, DAY_LABELS_FULL, todayISO } from "@/lib/scoring";
-import { buildWeeklyReport, type UnitChange, type WeekStats } from "@/lib/analysis";
+import { dayOfWeekMonFirst, DAY_LABELS_FULL, todayISO } from "@/lib/scoring";
+import { buildSubjectTrend, buildWeeklyReport, type UnitChange, type WeekStats } from "@/lib/analysis";
+import { dailyStats, monthlyStats, sumActualMinutes, weeklyStats, type PeriodStat } from "@/lib/planTracking";
+import { formatMinutes } from "@/lib/allocation";
+import SubjectTrendChart from "@/components/SubjectTrendChart";
 import { buildSubjectColorMap, colorOf, scoreColor } from "@/lib/palette";
 import { ArrowRightIcon } from "@/components/Icons";
 import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader, SubjectChip } from "@/components/ui";
@@ -37,7 +40,8 @@ export default function ReportPage() {
       const [subjectsRes, recordsRes, planRes] = await Promise.all([
         supabase.from("subjects").select("*"),
         supabase.from("study_records").select("*"),
-        supabase.from("plan_items").select("*").gte("plan_date", addDaysISO(today, -13)),
+        // 달성률(최근 6개월)·공부 시간 누적까지 보려고 계획 칸은 전부 불러온다
+        supabase.from("plan_items").select("*").lte("plan_date", today),
       ]);
       const firstError = subjectsRes.error ?? recordsRes.error;
       if (firstError) {
@@ -59,11 +63,25 @@ export default function ReportPage() {
   const nameById = new Map(subjects.map((s) => [s.id, s.name]));
   const { thisWeek, lastWeek } = report;
 
+  const actualSum = (from: string, to: string) => {
+    const inRange = planItems.filter((it) => it.plan_date >= from && it.plan_date <= to && it.actual_minutes != null);
+    return inRange.length ? inRange.reduce((s, it) => s + (it.actual_minutes ?? 0), 0) : null;
+  };
+  const trend = useMemo(() => buildSubjectTrend(subjects, records), [subjects, records]);
+  const timeTotals = sumActualMinutes(planItems);
+
   const rows: Row[] = [
     { label: "학습 기록", last: lastWeek.records, now: thisWeek.records, unit: "개", better: "up" },
     { label: "공부한 날", last: lastWeek.studyDays, now: thisWeek.studyDays, unit: "일", better: "up" },
     { label: "평균 기본 점수", last: lastWeek.avgScore, now: thisWeek.avgScore, unit: "점", better: "up" },
     { label: "계획 이행률", last: lastWeek.adherenceRate, now: thisWeek.adherenceRate, unit: "%", better: "up" },
+    {
+      label: "실제 공부 시간",
+      last: actualSum(lastWeek.from, lastWeek.to),
+      now: actualSum(thisWeek.from, thisWeek.to),
+      unit: "분",
+      better: "up",
+    },
   ];
 
   const summary = buildSummary(thisWeek, lastWeek, report.improved[0], nameById);
@@ -90,6 +108,7 @@ export default function ReportPage() {
           </Link>
         </div>
       ) : (
+        <div className="flex flex-col gap-6">
         <div className="rise-stagger grid items-start gap-6 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
           {/* 한 주 성적표 */}
           <section className="sheet" aria-labelledby="week-title">
@@ -243,8 +262,164 @@ export default function ReportPage() {
             </section>
           </div>
         </div>
+
+        <div className="rise-stagger grid items-start gap-6 lg:grid-cols-2">
+          {/* 학습 공백 변화 */}
+          <section className="sheet lg:col-span-2" aria-labelledby="trend-title">
+            <div className="sheet-head">
+              <h2 id="trend-title" className="sheet-title">
+                과목별 학습 점수 변화
+              </h2>
+              <span className="text-xs text-ink-muted">올라갈수록 학습 공백이 줄어든 것 · 시험 임박 감점 제외</span>
+            </div>
+            <SubjectTrendChart
+              trend={trend}
+              colorOf={(id) => colorOf(colors, id)}
+              nameOf={(id) => nameById.get(id) ?? "?"}
+            />
+          </section>
+
+          <CompletionStats planItems={planItems} today={today} />
+
+          {/* 공부 시간 누적 */}
+          <section className="sheet" aria-labelledby="time-total-title">
+            <div className="sheet-head">
+              <h2 id="time-total-title" className="sheet-title">
+                공부 시간 누적
+              </h2>
+              <Link href="/plan" className="text-[13px] font-semibold text-accent hover:underline">
+                시간 적기
+              </Link>
+            </div>
+            {timeTotals.length === 0 ? (
+              <p className="px-5 py-4 text-[14px] text-ink-muted">
+                학습 계획 화면의 &lsquo;계획 vs 실제 공부 시간&rsquo;에 실제로 공부한 시간을 적으면 과목·단원별로 쌓여요.
+              </p>
+            ) : (
+              <ul>
+                {timeTotals.map((t, i) => {
+                  const max = timeTotals[0].minutes;
+                  return (
+                    <li key={t.subjectId} className="flex flex-col gap-1.5 border-t border-rule px-5 py-3 first:border-t-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-[14px] font-bold">
+                          <SubjectChip color={colorOf(colors, t.subjectId)} />
+                          {nameById.get(t.subjectId) ?? "?"}
+                        </span>
+                        <span className="text-[15px] font-extrabold">{formatMinutes(t.minutes)}</span>
+                      </div>
+                      <div className="h-2 bg-ground">
+                        <span
+                          className="bar-grow block h-full"
+                          style={{
+                            width: `${(t.minutes / max) * 100}%`,
+                            backgroundColor: colorOf(colors, t.subjectId),
+                            animationDelay: `${320 + i * 70}ms`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-ink-muted">
+                        {t.units
+                          .slice(0, 4)
+                          .map((u) => `${u.unit} ${formatMinutes(u.minutes)}`)
+                          .join(" · ")}
+                        {t.units.length > 4 && ` 외 ${t.units.length - 4}개`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+        </div>
       )}
     </PageFrame>
+  );
+}
+
+const PERIODS = [
+  { key: "day", label: "일별", note: "최근 14일" },
+  { key: "week", label: "주별", note: "최근 8주 · 월요일 시작" },
+  { key: "month", label: "월별", note: "최근 6개월" },
+] as const;
+
+function CompletionStats({ planItems, today }: { planItems: PlanItem[]; today: string }) {
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]["key"]>("week");
+  const stats: PeriodStat[] =
+    period === "day" ? dailyStats(planItems, today) : period === "week" ? weeklyStats(planItems, today) : monthlyStats(planItems, today);
+  const withPlan = stats.filter((s) => s.rate !== null);
+  const total = stats.reduce((n, s) => n + s.total, 0);
+  const done = stats.reduce((n, s) => n + s.completed, 0);
+
+  return (
+    <section className="sheet" aria-labelledby="completion-title">
+      <div className="sheet-head">
+        <h2 id="completion-title" className="sheet-title">
+          계획 달성률
+        </h2>
+        <div role="tablist" aria-label="기간 단위" className="flex border border-rule-strong">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              role="tab"
+              aria-selected={period === p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-2.5 py-1 text-[13px] font-semibold ${
+                period === p.key ? "bg-mark text-on-mark" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-3 px-5 py-4">
+        <p className="text-[13px] text-ink-soft">
+          {PERIODS.find((p) => p.key === period)!.note} ·{" "}
+          {total === 0 ? (
+            "저장된 계획이 없어요"
+          ) : (
+            <>
+              {total}칸 중 <strong className="text-ink">{done}칸</strong> 완료 ({Math.round((done / total) * 1000) / 10}%)
+            </>
+          )}
+        </p>
+        {/* 기간마다 막대 하나: 높이 = 달성률, 계획이 없던 기간은 비움 */}
+        <div
+          className="grid h-[132px] items-end gap-1"
+          style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+          role="img"
+          aria-label={withPlan.map((s) => `${s.label} ${s.rate}%`).join(", ") || "계획 없음"}
+        >
+          {stats.map((s, i) => (
+            <div key={s.from} className="flex h-full flex-col items-center justify-end gap-1" title={`${s.label} ${s.total}칸 중 ${s.completed}칸`}>
+              {s.rate !== null && <span className="text-[11px] font-bold tabular-nums text-ink-soft">{Math.round(s.rate)}</span>}
+              <span
+                className={`bar-rise w-full ${s.rate === null ? "" : "bg-mark"}`}
+                style={{
+                  height: s.rate === null ? 2 : `${Math.max(3, s.rate)}%`,
+                  backgroundColor: s.rate === null ? "rgb(var(--c-rule))" : undefined,
+                  animationDelay: `${200 + i * 30}ms`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}>
+          {stats.map((s, i) => (
+            <span
+              key={s.from}
+              className="truncate text-center text-[10px] text-ink-muted sm:text-[11px]"
+              style={{ visibility: period === "day" && i % 2 === 1 && i !== stats.length - 1 ? "hidden" : undefined }}
+            >
+              {s.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 

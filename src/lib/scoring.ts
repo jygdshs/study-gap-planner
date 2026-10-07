@@ -312,7 +312,8 @@ export interface PlanDay {
   date: string;
   dayLabel: string;
   availableHours: number;
-  items: { subjectId: string; subjectName: string; unit: string; score: number }[]; // 하루 최대 2개 추천
+  // 하루 최대 2개 추천. carriedFrom: 그 날짜에 못 한 공부를 옮겨 온 칸 (planTracking.carryOverMissed)
+  items: { subjectId: string; subjectName: string; unit: string; score: number; carriedFrom?: string }[];
   exams: { subjectId: string; subjectName: string }[]; // 그날 보는 시험
 }
 

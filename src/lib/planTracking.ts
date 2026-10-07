@@ -10,8 +10,8 @@
 //     → "결과 입력 필요" 목록. 결과를 입력해야 새 학습 점수/새 계획이 나온다.
 //  3) 계획 갱신 시, 이미 완료한 칸은 기록으로 남기고 나머지 칸만 새 추천으로 바꾼다.
 
-import type { PlanItem, StudyRecord } from "@/types/study";
-import type { PlanDay } from "@/lib/scoring";
+import type { PlanItem, StudyRecord, Subject } from "@/types/study";
+import { addDaysISO, dayOfWeekMonFirst, type PlanDay } from "@/lib/scoring";
 
 export interface AdherenceSummary {
   total: number; // 오늘까지 저장된 계획 칸 수
@@ -107,4 +107,163 @@ export function diffPlanForSave(
   }
 
   return { upserts, deleteIds };
+}
+
+// ---------------------------------------------------------------------------
+// 계획 자동 재조정: 지난 날짜에 못 한 칸을 앞으로의 날짜로 옮긴다
+// ---------------------------------------------------------------------------
+
+/**
+ * 지난 날짜(오늘 전)에 저장했지만 완료하지 못한 칸 중, 아직 '해결'되지 않은 것.
+ * 해결 = 그 날짜 이후에 같은 단원을 완료 체크했거나, 같은 단원의 학습 결과를 입력했음.
+ * 같은 단원이 여러 번 밀렸으면 가장 오래된 것 하나만 남긴다.
+ */
+export function findMissedItems(items: PlanItem[], records: StudyRecord[], today: string): PlanItem[] {
+  const keyOf = (x: { subject_id: string; unit: string }) => `${x.subject_id}::${x.unit}`;
+  const missed = new Map<string, PlanItem>();
+  const sorted = [...items].sort((a, b) =>
+    a.plan_date === b.plan_date ? a.slot - b.slot : a.plan_date < b.plan_date ? -1 : 1
+  );
+  for (const it of sorted) {
+    if (it.completed || it.plan_date >= today) continue;
+    const key = keyOf(it);
+    if (missed.has(key)) continue;
+    const doneLater = items.some((o) => o.completed && keyOf(o) === key && o.plan_date >= it.plan_date);
+    const recordLater = records.some((r) => keyOf(r) === key && r.study_date >= it.plan_date);
+    if (!doneLater && !recordLater) missed.set(key, it);
+  }
+  return [...missed.values()];
+}
+
+export interface CarriedItem {
+  from: string; // 원래 계획 날짜
+  to: string; // 옮겨 간 날짜
+  subjectId: string;
+  unit: string;
+}
+
+/**
+ * 못 한 칸을 오래된 것부터, 공부 가능 시간이 있는 가장 가까운 날의 1교시에 넣는다.
+ *  - 하루에 옮겨 오는 칸은 1개까지 (추천 계획이 밀린 공부로만 채워지지 않도록)
+ *  - 그날 이미 같은 단원이 있으면 그 칸을 1교시로 올리기만 한다
+ *  - 칸이 꽉 차 있으면 그날 점수가 더 높은(덜 급한) 2교시 추천을 뺀다
+ *  - 시험이 끝난 과목은 옮기지 않는다
+ */
+export function carryOverMissed(
+  planDays: PlanDay[],
+  missed: PlanItem[],
+  subjects: Subject[],
+  scoreOf: (subjectId: string, unit: string) => number
+): { days: PlanDay[]; carried: CarriedItem[] } {
+  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const queue = missed.filter((m) => subjectById.has(m.subject_id));
+  const carried: CarriedItem[] = [];
+
+  const days = planDays.map((day) => {
+    if (queue.length === 0 || day.availableHours <= 0) return day;
+    const qi = queue.findIndex((m) => {
+      const exam = subjectById.get(m.subject_id)!.exam_date;
+      return !exam || exam > day.date;
+    });
+    if (qi < 0) return day;
+    const [m] = queue.splice(qi, 1);
+    carried.push({ from: m.plan_date, to: day.date, subjectId: m.subject_id, unit: m.unit });
+
+    const items = [...day.items];
+    const existing = items.findIndex((it) => it.subjectId === m.subject_id && it.unit === m.unit);
+    let moved: PlanDay["items"][number];
+    if (existing >= 0) {
+      [moved] = items.splice(existing, 1);
+      moved = { ...moved, carriedFrom: m.plan_date };
+    } else {
+      moved = {
+        subjectId: m.subject_id,
+        subjectName: subjectById.get(m.subject_id)!.name,
+        unit: m.unit,
+        score: scoreOf(m.subject_id, m.unit),
+        carriedFrom: m.plan_date,
+      };
+      if (items.length >= 2) items.pop();
+    }
+    return { ...day, items: [moved, ...items] };
+  });
+
+  return { days, carried };
+}
+
+// ---------------------------------------------------------------------------
+// 완료율 통계 (일 / 주 / 월)
+// ---------------------------------------------------------------------------
+
+export interface PeriodStat extends AdherenceSummary {
+  label: string;
+  from: string;
+  to: string;
+}
+
+const md = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
+
+/** 최근 days일, 날짜별 이행률 */
+export function dailyStats(items: PlanItem[], today: string, days = 14): PeriodStat[] {
+  return Array.from({ length: days }, (_, i) => {
+    const d = addDaysISO(today, i - (days - 1));
+    return { label: md(d), from: d, to: d, ...summarizeAdherence(items, d, d) };
+  });
+}
+
+/** 최근 weeks주(월요일 시작), 주별 이행률. 이번 주는 오늘까지만 */
+export function weeklyStats(items: PlanItem[], today: string, weeks = 8): PeriodStat[] {
+  const thisMonday = addDaysISO(today, -dayOfWeekMonFirst(today));
+  return Array.from({ length: weeks }, (_, i) => {
+    const from = addDaysISO(thisMonday, (i - (weeks - 1)) * 7);
+    const sunday = addDaysISO(from, 6);
+    const to = sunday > today ? today : sunday;
+    return { label: `${md(from)}~`, from, to, ...summarizeAdherence(items, from, to) };
+  });
+}
+
+/** 최근 months개월, 월별 이행률. 이번 달은 오늘까지만 */
+export function monthlyStats(items: PlanItem[], today: string, months = 6): PeriodStat[] {
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7)); // 1~12
+  return Array.from({ length: months }, (_, i) => {
+    const idx = y * 12 + (m - 1) - (months - 1 - i);
+    const yy = Math.floor(idx / 12);
+    const mm = (idx % 12) + 1;
+    const from = `${yy}-${String(mm).padStart(2, "0")}-01`;
+    const nextIdx = idx + 1;
+    const nextFrom = `${Math.floor(nextIdx / 12)}-${String((nextIdx % 12) + 1).padStart(2, "0")}-01`;
+    const monthEnd = addDaysISO(nextFrom, -1);
+    const to = monthEnd > today ? today : monthEnd;
+    return { label: `${mm}월`, from, to, ...summarizeAdherence(items, from, to) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 실제 공부 시간 누적
+// ---------------------------------------------------------------------------
+
+export interface StudyTimeTotal {
+  subjectId: string;
+  minutes: number;
+  units: { unit: string; minutes: number }[]; // 많은 순
+}
+
+/** 실제 공부 시간(actual_minutes)을 과목·단원별로 더한다. 많은 과목부터 */
+export function sumActualMinutes(items: PlanItem[]): StudyTimeTotal[] {
+  const bySubject = new Map<string, Map<string, number>>();
+  for (const it of items) {
+    const min = it.actual_minutes ?? 0;
+    if (min <= 0) continue;
+    if (!bySubject.has(it.subject_id)) bySubject.set(it.subject_id, new Map());
+    const units = bySubject.get(it.subject_id)!;
+    units.set(it.unit, (units.get(it.unit) ?? 0) + min);
+  }
+  return [...bySubject.entries()]
+    .map(([subjectId, units]) => ({
+      subjectId,
+      minutes: [...units.values()].reduce((a, b) => a + b, 0),
+      units: [...units.entries()].map(([unit, minutes]) => ({ unit, minutes })).sort((a, b) => b.minutes - a.minutes),
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
 }

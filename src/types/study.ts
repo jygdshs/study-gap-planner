@@ -60,5 +60,8 @@ export interface PlanItem {
   unit: string;
   completed: boolean;
   completed_at: string | null;
+  // 004 마이그레이션: 계획 vs 실제 공부 시간(분). 마이그레이션 전이면 필드 자체가 없다
+  planned_minutes?: number | null;
+  actual_minutes?: number | null;
   created_at: string;
 }

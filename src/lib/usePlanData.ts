@@ -15,7 +15,13 @@ import {
   todayISO,
   type PlanDay,
 } from "@/lib/scoring";
-import { diffPlanForSave, findPendingResultInputs, summarizeAdherence } from "@/lib/planTracking";
+import {
+  carryOverMissed,
+  diffPlanForSave,
+  findMissedItems,
+  findPendingResultInputs,
+  summarizeAdherence,
+} from "@/lib/planTracking";
 import { buildSubjectColorMap } from "@/lib/palette";
 import { allocateMinutes } from "@/lib/allocation";
 import { useAuth } from "@/lib/auth";
@@ -32,6 +38,8 @@ export function usePlanData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  // 004 마이그레이션(planned_minutes, actual_minutes 열)을 실행했는지
+  const [hasTimeColumns, setHasTimeColumns] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
@@ -65,6 +73,11 @@ export function usePlanData() {
         supabase.from("study_records").select("*"),
         supabase.from("weekly_availability").select("*"),
         loadPlanItems(),
+        supabase
+          .from("plan_items")
+          .select("planned_minutes, actual_minutes")
+          .limit(1)
+          .then(({ error }) => setHasTimeColumns(!error)),
       ]);
 
       const firstError = subjectsRes.error ?? recordsRes.error ?? availabilityRes.error;
@@ -90,7 +103,7 @@ export function usePlanData() {
   const unitStatuses = buildUnitStatuses(activeSubjects, records);
   const subjectPriorities = buildSubjectPriorities(activeSubjects, unitStatuses);
   const horizon = planHorizon(subjects, today);
-  const planDays: PlanDay[] = buildStudyPlan(subjects, records, availability, today, horizon.days);
+  const basePlanDays: PlanDay[] = buildStudyPlan(subjects, records, availability, today, horizon.days);
   const noStudyHours = availability.every((w) => !w.available_hours);
   const colors = buildSubjectColorMap(subjects);
   const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
@@ -103,12 +116,24 @@ export function usePlanData() {
   const savedAt = (date: string, slot: number) =>
     planError ? undefined : itemsByDate.get(date)?.find((it) => it.slot === slot);
 
-  // 9차시: 점수에 따른 시간 배분 — 그날 칸들(저장된 칸 우선, 없으면 추천 칸)의 학습 점수로 하루 시간을 나눈다
   const todayScoreByUnit = new Map(unitStatuses.map((u) => [`${u.subjectId}::${u.unit}`, u.finalScore]));
+
+  // 계획 자동 재조정: 지난 날짜에 못 한 칸(아직 결과도 없는 단원)을 앞으로의 가장 가까운 날 1교시로 옮긴다
+  const missedItems = planError ? [] : findMissedItems(planItems, records, today);
+  const { days: planDays, carried } = carryOverMissed(
+    basePlanDays,
+    missedItems,
+    subjects,
+    (subjectId, unit) => todayScoreByUnit.get(`${subjectId}::${unit}`) ?? 50
+  );
+
+  // 9차시: 점수에 따른 시간 배분 — 그날 칸들(저장된 칸 우선, 없으면 추천 칸)의 학습 점수로 하루 시간을 나눈다
   /** 그날 [1교시, 2교시] 배정 시간(분). 칸이 없으면 null */
-  const minutesFor = (day: PlanDay): (number | null)[] => {
+  //  preferRec: 저장할 때 쓰는 값 — 완료한 칸만 저장된 것을 쓰고 나머지는 새 추천 기준으로 나눈다
+  const minutesFor = (day: PlanDay, preferRec = false): (number | null)[] => {
     const cells = [0, 1].map((slot) => {
-      const saved = savedAt(day.date, slot);
+      const stored = savedAt(day.date, slot);
+      const saved = preferRec && !stored?.completed ? undefined : stored;
       const subjectId = saved?.subject_id ?? day.items[slot]?.subjectId;
       const unit = saved?.unit ?? day.items[slot]?.unit;
       if (!subjectId || !unit) return null;
@@ -161,10 +186,16 @@ export function usePlanData() {
       }
     }
     if (upserts.length > 0) {
+      const dayByDate = new Map(planDays.map((d) => [d.date, d]));
       const { error } = await supabase
         .from("plan_items")
         .upsert(
-          upserts.map((u) => ({ ...u, user_id: user?.id })),
+          upserts.map((u) => {
+            const row = { ...u, user_id: user?.id };
+            if (!hasTimeColumns) return row;
+            const day = dayByDate.get(u.plan_date);
+            return { ...row, planned_minutes: day ? minutesFor(day, true)[u.slot] : null };
+          }),
           { onConflict: "user_id,plan_date,slot" }
         );
       if (error) {
@@ -201,8 +232,31 @@ export function usePlanData() {
     }
   };
 
+  /** 그 칸의 계획 시간(분): 저장할 때 기록한 값 → 계획 기간 안이면 지금 배분 → 없으면 null */
+  const plannedMinutesOf = (item: PlanItem): number | null => {
+    if (item.planned_minutes != null) return item.planned_minutes;
+    const day = planDays.find((d) => d.date === item.plan_date);
+    return day ? minutesFor(day)[item.slot] : null;
+  };
+
+  /** 실제 공부 시간(분) 저장. null이면 지운다 */
+  const setActualMinutes = async (item: PlanItem, minutes: number | null) => {
+    setPlanItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, actual_minutes: minutes } : it)));
+    const { error } = await supabase.from("plan_items").update({ actual_minutes: minutes }).eq("id", item.id);
+    if (error) {
+      setPlanItems((prev) => prev.map((it) => (it.id === item.id ? item : it)));
+      setMessage({ type: "error", text: `공부 시간 저장 실패: ${error.message}` });
+      return false;
+    }
+    return true;
+  };
+
   return {
     today,
+    carried,
+    hasTimeColumns,
+    plannedMinutesOf,
+    setActualMinutes,
     subjects,
     horizon,
     noStudyHours,

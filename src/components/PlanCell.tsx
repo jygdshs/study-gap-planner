@@ -16,7 +16,8 @@ import { formatMinutes } from "@/lib/allocation";
 // 이미 있던 칸은 다시 그려져도 전환이 반복되지 않고, 새로 완료한 칸만 도장이 찍힌다.
 
 // minutes: 9차시 점수에 따른 시간 배분 — 이 칸에 배정된 공부 시간(분)
-type Common = { compact?: boolean; animate?: boolean; delay?: number; minutes?: number | null };
+// carriedFrom: 그 날짜에 못 한 공부를 옮겨 온 칸이면 원래 날짜(YYYY-MM-DD)
+type Common = { compact?: boolean; animate?: boolean; delay?: number; minutes?: number | null; carriedFrom?: string };
 
 type Props = Common &
   (
@@ -53,6 +54,14 @@ export default function PlanCell(props: Props) {
         {props.minutes}분
       </span>
     ) : null;
+  const carriedTag = props.carriedFrom ? (
+    <span
+      className="ml-1 inline-block border border-current px-1 py-px align-middle text-[10px] font-bold leading-none lg:text-[11px]"
+      title={`${Number(props.carriedFrom.slice(5, 7))}.${Number(props.carriedFrom.slice(8, 10))}에 못 한 공부를 옮겼어요`}
+    >
+      이월
+    </span>
+  ) : null;
   const subjectText = props.compact ? "text-[12px]" : "text-[12px] lg:text-[13px]";
   const unitText = props.compact ? "text-[14px]" : "text-[14px] lg:text-[16px]";
 
@@ -81,7 +90,10 @@ export default function PlanCell(props: Props) {
         className={`${fill} flex h-full ${minH} flex-col justify-between gap-1 border border-dashed bg-sheet p-2`}
         style={{ ...motion, borderColor: subjectInk(props.color), color: subjectInk(props.color) }}
       >
-        <span className={`${subjectText} font-semibold leading-none`}>{props.subjectName}</span>
+        <span className={`${subjectText} font-semibold leading-none`}>
+          {props.subjectName}
+          {carriedTag}
+        </span>
         <span className="flex flex-col gap-1">
           <span className={`${unitText} font-bold leading-snug`}>{props.unit}</span>
           {timeLabel}
@@ -97,6 +109,7 @@ export default function PlanCell(props: Props) {
     <>
       <span className={`pr-7 ${subjectText} font-semibold leading-none ${completed ? "" : "text-white/85"}`}>
         {subjectName}
+        {carriedTag}
       </span>
       <span className={`flex flex-col gap-1 pr-6 ${completed ? "" : "text-white"}`}>
         <span className={`${unitText} font-bold leading-snug ${completed ? "line-through decoration-2" : ""}`}>

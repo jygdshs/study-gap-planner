@@ -2,7 +2,7 @@
 // 화면(scores, report)은 이 결과를 그리기만 한다.
 
 import type { PlanItem, StudyRecord, Subject } from "@/types/study";
-import { addDaysISO, scoreOfRecord } from "@/lib/scoring";
+import { addDaysISO, buildUnitStatuses, scoreOfRecord } from "@/lib/scoring";
 import { summarizeAdherence } from "@/lib/planTracking";
 
 const normalizeReason = (r: string) => r.trim().replace(/\s+/g, " ");
@@ -200,4 +200,38 @@ export function buildWeeklyReport(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5),
   };
+}
+
+// ---------------------------------------------------------------------------
+// 학습 공백 변화: 과목별 학습 점수가 시간에 따라 어떻게 바뀌었는지
+// ---------------------------------------------------------------------------
+
+export interface SubjectTrend {
+  dates: string[]; // 기록이 있었던 날 (오래된 순, 최근 maxPoints개)
+  series: { subjectId: string; points: (number | null)[] }[]; // dates와 같은 길이, 그날까지 기록이 없으면 null
+}
+
+/**
+ * 기록이 있었던 날마다 '그날까지의 기록'으로 과목 학습 점수(단원 평균)를 다시 계산한다.
+ * 시험 임박 감점은 빼고 계산해, 공부해서 생긴 변화만 보이게 한다. 점수가 오를수록 공백이 줄어든 것.
+ */
+export function buildSubjectTrend(subjects: Subject[], records: StudyRecord[], maxPoints = 14): SubjectTrend {
+  const dates = [...new Set(records.map((r) => r.study_date))].sort().slice(-maxPoints);
+  const plain = subjects.map((s) => ({ ...s, exam_date: null }));
+  const series = subjects.map((s) => ({ subjectId: s.id, points: [] as (number | null)[] }));
+  const idx = new Map(subjects.map((s, i) => [s.id, i]));
+
+  for (const date of dates) {
+    const units = buildUnitStatuses(plain, records.filter((r) => r.study_date <= date), date);
+    const sums = new Map<string, { sum: number; n: number }>();
+    for (const u of units) {
+      const cur = sums.get(u.subjectId) ?? { sum: 0, n: 0 };
+      sums.set(u.subjectId, { sum: cur.sum + u.finalScore, n: cur.n + 1 });
+    }
+    for (const s of subjects) {
+      const v = sums.get(s.id);
+      series[idx.get(s.id)!].points.push(v ? round1(v.sum / v.n) : null);
+    }
+  }
+  return { dates, series: series.filter((x) => x.points.some((p) => p !== null)) };
 }

@@ -5,6 +5,8 @@
 -- ※ 이미 예전 스키마(로그인 없음)로 쓰던 프로젝트라면 이 파일 대신
 --   supabase/migrations/002_auth_per_user.sql 을 실행하세요. (기존 데이터를 내 계정으로 옮김)
 -- ※ 실제 시험 성적 비교(/results)를 쓰려면 이어서 supabase/migrations/003_exam_results.sql 도 실행하세요.
+-- ※ 예전에 만든 프로젝트에서 계획 vs 실제 공부 시간을 쓰려면 supabase/migrations/004_plan_minutes.sql 을 실행하세요.
+--   (이 파일로 새로 만들었다면 plan_items에 이미 들어 있음)
 
 -- 1) 과목 (과목명, 과목별 시험 날짜)
 create table if not exists subjects (
@@ -63,6 +65,8 @@ create table if not exists plan_items (
   unit text not null,
   completed boolean not null default false,
   completed_at timestamptz,
+  planned_minutes integer check (planned_minutes is null or planned_minutes between 0 and 1440), -- 계획한 시간(분)
+  actual_minutes integer check (actual_minutes is null or actual_minutes between 0 and 1440),   -- 실제 공부 시간(분)
   created_at timestamptz not null default now(),
   constraint plan_items_user_date_slot_key unique (user_id, plan_date, slot)
 );

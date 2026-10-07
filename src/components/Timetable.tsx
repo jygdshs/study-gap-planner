@@ -44,6 +44,12 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
     const delay = delayFor(planDays.indexOf(day), slot);
     const minutes = minutesFor(day)[slot];
     const saved = savedAt(day.date, slot);
+    const rec = day.items[slot];
+    // 이월 표시: 추천 칸이 이월이고, 저장된 칸이 있으면 같은 단원일 때만
+    const carriedFrom =
+      rec?.carriedFrom && (!saved || (saved.subject_id === rec.subjectId && saved.unit === rec.unit))
+        ? rec.carriedFrom
+        : undefined;
     if (saved) {
       return (
         <PlanCell
@@ -53,6 +59,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           animate={animate}
           delay={delay}
           minutes={minutes}
+          carriedFrom={saved.completed ? undefined : carriedFrom}
           color={colorOf(colors, saved.subject_id)}
           subjectName={subjectNameById.get(saved.subject_id) ?? "?"}
           unit={saved.unit}
@@ -62,7 +69,6 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         />
       );
     }
-    const rec = day.items[slot];
     if (rec) {
       return (
         <PlanCell
@@ -72,6 +78,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           animate={animate}
           delay={delay}
           minutes={minutes}
+          carriedFrom={carriedFrom}
           color={colorOf(colors, rec.subjectId)}
           subjectName={rec.subjectName}
           unit={rec.unit}
