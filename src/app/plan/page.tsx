@@ -9,8 +9,7 @@ import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
 import Timetable from "@/components/Timetable";
 import TimeLogSection from "@/components/TimeLogSection";
-import PlanPrintSheet from "@/components/PlanPrintSheet";
-import { buildExportDays, downloadPlanImage } from "@/lib/exportPlan";
+import { buildExportDays, downloadPlanImage, downloadPlanPdf } from "@/lib/exportPlan";
 import { ArrowRightIcon, CheckIcon, RefreshIcon } from "@/components/Icons";
 import {
   ConfigNotice,
@@ -51,7 +50,7 @@ export default function PlanPage() {
     noStudyHours,
     carried,
   } = data;
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   // 계획 기간이 7일보다 길면(시험 일정) 한 주씩 나눠 보여준다
@@ -68,15 +67,17 @@ export default function PlanPage() {
   // 이행 기록 격자의 날짜 열: 6일 전 ~ 오늘
   const exportTitle = `학습 계획 ${weekRange}`;
   const exportSubtitle = `${periodNote} · ${shortDate(today)} 기준`;
-  const saveImage = async () => {
-    setExporting(true);
+  const exportPlan = async (kind: "png" | "pdf") => {
+    setExporting(kind);
     setExportError(null);
+    const fileName = `학습계획_${planDays[0].date}.${kind}`;
     try {
-      await downloadPlanImage(buildExportDays(data), exportTitle, exportSubtitle, `학습계획_${planDays[0].date}.png`);
+      if (kind === "png") await downloadPlanImage(buildExportDays(data), exportTitle, exportSubtitle, fileName);
+      else await downloadPlanPdf(buildExportDays(data), exportTitle, exportSubtitle, fileName);
     } catch (e) {
-      setExportError(e instanceof Error ? e.message : "이미지를 만들지 못했어요.");
+      setExportError(e instanceof Error ? e.message : "파일을 만들지 못했어요.");
     }
-    setExporting(false);
+    setExporting(null);
   };
 
   const adherenceDates = Array.from({ length: ADHERENCE_DAYS }, (_, i) =>
@@ -217,15 +218,14 @@ export default function PlanPage() {
               {/* 내보내기: 계획 기간 전체 */}
               <div className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-3">
                 <span className="mr-auto text-[13px] text-ink-muted">계획 {planDays.length}일 전체를 내보내요</span>
-                <button type="button" onClick={saveImage} disabled={exporting} className="btn-quiet">
-                  {exporting ? "만드는 중…" : "이미지로 저장"}
+                <button type="button" onClick={() => exportPlan("png")} disabled={exporting !== null} className="btn-quiet">
+                  {exporting === "png" ? "만드는 중…" : "이미지로 저장"}
                 </button>
-                <button type="button" onClick={() => window.print()} className="btn-quiet">
-                  인쇄 · PDF
+                <button type="button" onClick={() => exportPlan("pdf")} disabled={exporting !== null} className="btn-quiet">
+                  {exporting === "pdf" ? "만드는 중…" : "PDF로 저장"}
                 </button>
               </div>
               {exportError && <p className="notice-error mx-5 mb-5">{exportError}</p>}
-              <PlanPrintSheet days={buildExportDays(data)} title={exportTitle} subtitle={exportSubtitle} />
 
               {message && (
                 <p

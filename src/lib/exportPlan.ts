@@ -1,10 +1,9 @@
-// 계획 내보내기: 계획 기간 전체를 이미지(PNG)로 저장하거나 인쇄(PDF로 저장)한다.
+// 계획 내보내기: 계획 기간 전체를 이미지(PNG) 또는 PDF 파일로 저장한다.
 //  - 저장된 칸이 있으면 저장된 칸, 없으면 추천 칸을 쓴다 (화면 시간표와 같은 규칙)
 //  - 이미지는 외부 라이브러리 없이 canvas에 직접 그린다. 화면 테마와 상관없이 항상 밝은 종이색.
 
 import type { PlanData } from "@/lib/usePlanData";
 import { colorOf } from "@/lib/palette";
-import { formatMinutes } from "@/lib/allocation";
 
 export interface ExportCell {
   subjectName: string;
@@ -107,7 +106,12 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, width: number, maxLin
   return lines;
 }
 
-export async function drawPlanImage(days: ExportDay[], title: string, subtitle: string): Promise<HTMLCanvasElement> {
+export async function drawPlanImage(
+  days: ExportDay[],
+  title: string,
+  subtitle: string,
+  firstWeek = 1 // PDF 2쪽부터는 3주차, 5주차…로 이어서 센다
+): Promise<HTMLCanvasElement> {
   if (typeof document !== "undefined" && document.fonts) await document.fonts.ready;
 
   const W = 1200;
@@ -157,7 +161,7 @@ export async function drawPlanImage(days: ExportDay[], title: string, subtitle: 
     ctx.fillStyle = PAPER.muted;
     ctx.font = `600 13px ${FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText(`${wi + 1}주차`, x0 + LABEL / 2, y0 + HEAD_H / 2 + 5);
+    ctx.fillText(`${firstWeek + wi}주차`, x0 + LABEL / 2, y0 + HEAD_H / 2 + 5);
     ["1교시", "2교시"].forEach((t, i) => ctx.fillText(t, x0 + LABEL / 2, y0 + HEAD_H + SLOT_H * i + SLOT_H / 2 + 5));
     ctx.fillText("시간", x0 + LABEL / 2, y0 + HEAD_H + SLOT_H * 2 + HOURS_H / 2 + 5);
 
@@ -285,10 +289,7 @@ export async function drawPlanImage(days: ExportDay[], title: string, subtitle: 
   return canvas;
 }
 
-export async function downloadPlanImage(days: ExportDay[], title: string, subtitle: string, fileName: string) {
-  const canvas = await drawPlanImage(days, title, subtitle);
-  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("이미지를 만들지 못했어요.");
+function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -299,7 +300,96 @@ export async function downloadPlanImage(days: ExportDay[], title: string, subtit
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** 인쇄용 한 줄 설명: "수학 1계 미분방정식 · 70분" */
-export function cellText(cell: ExportCell): string {
-  return `${cell.subjectName} ${cell.unit}${cell.minutes ? ` · ${formatMinutes(cell.minutes)}` : ""}`;
+export async function downloadPlanImage(days: ExportDay[], title: string, subtitle: string, fileName: string) {
+  const canvas = await drawPlanImage(days, title, subtitle);
+  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("이미지를 만들지 못했어요.");
+  downloadBlob(blob, fileName);
+}
+
+// ---------------------------------------------------------------------------
+// PDF: 라이브러리 없이 직접 만든다. 2주씩 시간표 이미지(JPEG)를 그려 A4 가로 한 쪽에 하나씩 넣는다.
+// (한글 글꼴을 PDF에 넣지 않아도 되도록 글자까지 이미지로 그린 것을 쓴다)
+// ---------------------------------------------------------------------------
+
+const DAYS_PER_PAGE = 14;
+const A4_W = 842; // pt, 가로
+const A4_H = 595;
+const MARGIN = 24;
+
+async function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) throw new Error("PDF를 만들지 못했어요.");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/** JPEG 이미지들을 한 쪽에 하나씩 넣은 PDF 바이트 */
+function buildPdf(pages: { jpeg: Uint8Array; width: number; height: number }[]): Blob {
+  const enc = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const offsets: number[] = [];
+  let length = 0;
+  const push = (part: string | Uint8Array) => {
+    const bytes = typeof part === "string" ? enc.encode(part) : part;
+    chunks.push(bytes);
+    length += bytes.length;
+  };
+  const obj = (id: number, body: string | (string | Uint8Array)[]) => {
+    offsets[id] = length;
+    push(`${id} 0 obj\n`);
+    for (const part of Array.isArray(body) ? body : [body]) push(part);
+    push("\nendobj\n");
+  };
+
+  // 객체 번호: 1 카탈로그, 2 페이지 목록, 쪽마다 (쪽, 내용, 이미지) 3개씩
+  const pageIds = pages.map((_, i) => 3 + i * 3);
+  push("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2, `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+
+  pages.forEach((pg, i) => {
+    const pageId = pageIds[i];
+    const contentId = pageId + 1;
+    const imageId = pageId + 2;
+    // 여백 안에 비율을 지켜 가장 크게, 위쪽 가운데 정렬
+    const scale = Math.min((A4_W - MARGIN * 2) / pg.width, (A4_H - MARGIN * 2) / pg.height);
+    const w = pg.width * scale;
+    const h = pg.height * scale;
+    const x = (A4_W - w) / 2;
+    const y = A4_H - MARGIN - h;
+    const content = `q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im0 Do Q`;
+
+    obj(
+      pageId,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_W} ${A4_H}] ` +
+        `/Resources << /XObject << /Im0 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`
+    );
+    obj(contentId, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    obj(imageId, [
+      `<< /Type /XObject /Subtype /Image /Width ${pg.width} /Height ${pg.height} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pg.jpeg.length} >>\nstream\n`,
+      pg.jpeg,
+      "\nendstream",
+    ]);
+  });
+
+  const total = 3 + pages.length * 3;
+  const xrefAt = length;
+  let xref = `xref\n0 ${total}\n0000000000 65535 f \n`;
+  for (let id = 1; id < total; id++) xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  push(xref);
+  push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`);
+  return new Blob(chunks as BlobPart[], { type: "application/pdf" });
+}
+
+export async function downloadPlanPdf(days: ExportDay[], title: string, subtitle: string, fileName: string) {
+  const pages: { jpeg: Uint8Array; width: number; height: number }[] = [];
+  const pageCount = Math.ceil(days.length / DAYS_PER_PAGE);
+  for (let i = 0; i < days.length; i += DAYS_PER_PAGE) {
+    const part = days.slice(i, i + DAYS_PER_PAGE);
+    const pageNote = pageCount > 1 ? ` · ${i / DAYS_PER_PAGE + 1}/${pageCount}쪽` : "";
+    const canvas = await drawPlanImage(part, title, `${subtitle}${pageNote}`, i / 7 + 1);
+    pages.push({ jpeg: await canvasToJpeg(canvas), width: canvas.width, height: canvas.height });
+  }
+  downloadBlob(buildPdf(pages), fileName);
 }
