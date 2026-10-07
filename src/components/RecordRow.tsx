@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { scoreOfRecord } from "@/lib/scoring";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
+import UnitInput from "@/components/UnitInput";
 import type { StudyRecord } from "@/types/study";
 
 // 9차시: 학습 기록 한 줄 — 보기 / 수정 / 삭제.
@@ -106,10 +107,15 @@ export default function RecordRow({
     return (
       <li className="flex flex-col gap-3 border-t border-rule bg-sheet-alt px-4 py-4">
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className="field-label">단원</span>
-            <input value={unit} onChange={(e) => setUnit(e.target.value)} className="field py-2 text-[14px]" />
-          </label>
+            <UnitInput
+              subjectId={record.subject_id}
+              value={unit}
+              onChange={setUnit}
+              className="field py-2 text-[14px]"
+            />
+          </div>
           <label className="flex flex-col gap-1">
             <span className="field-label">학습 날짜</span>
             <input

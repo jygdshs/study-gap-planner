@@ -8,6 +8,7 @@ import { keywordScore } from "@/lib/keywords";
 import KeywordMatches from "@/components/KeywordMatches";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
+import UnitInput from "@/components/UnitInput";
 import { ArrowRightIcon } from "@/components/Icons";
 import { ConfigNotice, PageFrame, PageHeader, ScoreBar } from "@/components/ui";
 import type { RecordType } from "@/types/study";
@@ -174,16 +175,10 @@ export default function InputPage() {
               <SubjectPicker subjectId={subjectId} onSubjectChange={setSubjectId} />
             </div>
 
-            <label className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <span className="field-label">단원</span>
-              <input
-                type="text"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="예: 미분"
-                className="field"
-              />
-            </label>
+              <UnitInput subjectId={subjectId} value={unit} onChange={setUnit} />
+            </div>
 
             <div className="flex flex-col gap-2">
               <span className="field-label">유형</span>
