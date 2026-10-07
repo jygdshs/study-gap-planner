@@ -36,17 +36,21 @@ export default function PriorityList({
                 {sp.hasRecords ? sp.score : "—"}
               </span>
               <span />
-              <ScoreBar score={sp.hasRecords ? sp.score : 0} className="col-span-2 mt-2 w-full" />
+              <ScoreBar
+                score={sp.hasRecords ? sp.score : 0}
+                className="col-span-2 mt-2 w-full"
+                delay={260 + idx * 120}
+              />
             </div>
             {showUnits && sp.units.length > 0 && (
               <ul className="pb-3 pl-[60px] pr-5">
-                {sp.units.map((u) => (
+                {sp.units.map((u, ui) => (
                   <li
                     key={u.unit}
                     className="grid grid-cols-[minmax(0,1fr)_64px_40px] items-center gap-2 py-1 text-[14px]"
                   >
                     <span className="truncate text-ink-soft">{u.unit}</span>
-                    <ScoreBar score={u.finalScore} />
+                    <ScoreBar score={u.finalScore} delay={340 + idx * 120 + ui * 60} />
                     <span className="text-right font-semibold">{u.finalScore}</span>
                   </li>
                 ))}

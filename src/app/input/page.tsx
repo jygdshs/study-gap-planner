@@ -152,7 +152,7 @@ export default function InputPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+        className="rise-stagger grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
         noValidate
       >
         {/* 무엇을 공부했나 */}

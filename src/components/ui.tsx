@@ -23,7 +23,7 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="relative -mb-12 pb-[84px] pt-8 text-white sm:pt-12">
+    <div className="page-header relative -mb-12 pb-[84px] pt-8 text-white sm:pt-12">
       <div
         aria-hidden
         className="absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden bg-shell"
@@ -89,10 +89,13 @@ export function ScoreBar({
   score,
   className,
   thick,
+  delay = 0,
 }: {
   score: number;
   className?: string;
   thick?: boolean;
+  /** 처음 나타날 때 왼쪽에서 차오르는 시간차(ms) — 목록에서 순서대로 */
+  delay?: number;
 }) {
   const clamped = Math.max(0, Math.min(100, score));
   return (
@@ -102,8 +105,8 @@ export function ScoreBar({
       className={`relative block overflow-hidden bg-ground ${thick ? "h-3" : "h-2"} ${className ?? "w-full"}`}
     >
       <span
-        className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out"
-        style={{ width: `${clamped}%`, backgroundColor: scoreColor(clamped) }}
+        className="bar-grow absolute inset-y-0 left-0 transition-[width] duration-500 ease-out"
+        style={{ width: `${clamped}%`, backgroundColor: scoreColor(clamped), animationDelay: `${delay}ms` }}
       />
       {[25, 50, 75].map((t) => (
         <span key={t} aria-hidden className="absolute inset-y-0 w-px bg-sheet" style={{ left: `${t}%` }} />
@@ -153,7 +156,7 @@ export function ErrorNotice({ children }: { children: React.ReactNode }) {
  */
 export function LoadingSplit({ label }: { label: string }) {
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]" aria-busy="true">
+    <div className="rise-stagger grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]" aria-busy="true">
       <div className="sheet">
         <div className="sheet-head">
           <span className="text-sm text-ink-muted">{label}</span>

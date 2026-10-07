@@ -115,8 +115,8 @@ export default function AvailabilityPage() {
                 {/* 막대: 하루 공부 가능 시간 */}
                 <div className="relative h-24 bg-ground" aria-hidden>
                   <div
-                    className="absolute inset-x-0 bottom-0 bg-mark transition-[height] duration-300 ease-out"
-                    style={{ height: `${(v / scaleMax) * 100}%` }}
+                    className="bar-rise absolute inset-x-0 bottom-0 bg-mark transition-[height] duration-300 ease-out"
+                    style={{ height: `${(v / scaleMax) * 100}%`, animationDelay: `${220 + idx * 60}ms` }}
                   />
                   {Array.from({ length: Math.floor(scaleMax) - 1 }, (_, i) => (
                     <span

@@ -94,7 +94,7 @@ export default function HomePage() {
         <p className="text-[13px] text-shell-text">결과를 다시 입력하면 점수와 계획이 새로 계산돼요.</p>
       </PageHeader>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="rise-stagger grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {/* 오늘 공부할 칸 */}
         <section className="sheet" aria-labelledby="today-title">
           <div className="sheet-head">
@@ -175,12 +175,13 @@ export default function HomePage() {
             </div>
             <div className="p-5">
               <div className="grid grid-cols-7 gap-px border border-rule bg-rule">
-                {planDays.slice(0, 7).map((day) => {
+                {planDays.slice(0, 7).map((day, di) => {
                   const isToday = day.date === today;
                   return (
                     <div
                       key={day.date}
-                      className={`flex flex-col gap-1 p-1.5 ${
+                      style={{ animationDelay: `${300 + di * 60}ms` }}
+                      className={`cell-pop flex flex-col gap-1 p-1.5 ${
                         isToday
                           ? "bg-today outline outline-[3px] -outline-offset-[3px] outline-mark"
                           : "bg-sheet"

@@ -120,7 +120,7 @@ export default function ExamsPage() {
       {loading ? (
         <LoadingSplit label="과목을 불러오는 중…" />
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="rise-stagger grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           {/* 과목별 시험 날짜 */}
           <section className="sheet" aria-labelledby="exam-list-title">
             <div className="sheet-head">
@@ -263,7 +263,8 @@ export default function ExamsPage() {
                   return (
                     <div
                       key={date}
-                      className={`flex min-h-[64px] flex-col gap-1 p-1.5 ${
+                      style={{ animationDelay: `${260 + i * 14}ms` }}
+                      className={`cell-pop flex min-h-[64px] flex-col gap-1 p-1.5 ${
                         isToday
                           ? "bg-today outline outline-[3px] -outline-offset-[3px] outline-mark"
                           : inPlan

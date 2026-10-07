@@ -107,7 +107,7 @@ export default function ScoresPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="rise-stagger flex flex-col gap-6">
           <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
             {/* 단원 목록: 점수 낮은 순 */}
             <section className="sheet" aria-labelledby="units-title">
@@ -118,7 +118,7 @@ export default function ScoresPage() {
                 <span className="text-xs text-ink-muted">낮은 점수부터</span>
               </div>
               <ul role="listbox" aria-label="단원 선택">
-                {unitStatuses.map((u) => {
+                {unitStatuses.map((u, ui) => {
                   const selected = selectedUnit !== null && keyOf(u) === keyOf(selectedUnit);
                   return (
                     <li key={keyOf(u)} className="border-b border-rule last:border-b-0">
@@ -137,7 +137,7 @@ export default function ScoresPage() {
                           <span className="truncate text-[15px] font-bold">{u.unit}</span>
                         </span>
                         <span className="text-right text-[17px] font-extrabold">{u.finalScore}</span>
-                        <ScoreBar score={u.finalScore} className="col-span-2 w-full" />
+                        <ScoreBar score={u.finalScore} className="col-span-2 w-full" delay={260 + ui * 70} />
                       </button>
                     </li>
                   );

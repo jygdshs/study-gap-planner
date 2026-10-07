@@ -256,11 +256,98 @@
   animation: stamp-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ------------------------------------------------------------------ */
+/* 화면 전환: 메뉴로 다른 화면에 갈 때 (src/app/template.tsx의 .page-enter) */
+/*  - 진남색 띠는 그대로, 제목·설명만 아래에서 떠오른다                     */
+/*  - 그 아래 시트들은 .rise-stagger 안에서 왼쪽→오른쪽 순서로 올라온다      */
+/*  - 데이터가 늦게 도착해 새로 그려지는 시트도 같은 방식으로 올라온다       */
+/* ------------------------------------------------------------------ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes cell-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter .page-header h1 {
+  animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.page-enter .page-header h1 ~ * {
+  animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) 70ms both;
+}
+
+.page-enter .page-header > div > :last-child:not(:first-child) {
+  animation: rise 520ms cubic-bezier(0.16, 1, 0.3, 1) 110ms both;
+}
+
+/* 제목 아래의 다른 요소(안내 상자, 단독 시트 등) */
+.page-enter main > :not(.page-header):not(.rise-stagger) {
+  animation: rise 560ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+/* 여러 시트가 나란히 있는 격자: 순서대로 시간차 */
+.page-enter .rise-stagger > * {
+  animation: rise 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 120ms;
+}
+.page-enter .rise-stagger > :nth-child(2) {
+  animation-delay: 200ms;
+}
+.page-enter .rise-stagger > :nth-child(3) {
+  animation-delay: 280ms;
+}
+.page-enter .rise-stagger > :nth-child(n + 4) {
+  animation-delay: 340ms;
+}
+
+/* 공부 시간 막대: 아래에서 차오른다 */
+.bar-rise {
+  transform-origin: center bottom;
+  animation: bar-rise 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 달력·축소 시간표 칸: 차례로 나타난다 */
+.cell-pop {
+  animation: cell-pop 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cell-fill,
   .stamp-in,
   .bar-grow,
-  .band-rise {
+  .band-rise,
+  .bar-rise,
+  .cell-pop,
+  .page-enter .page-header h1,
+  .page-enter .page-header h1 ~ *,
+  .page-enter .page-header > div > :last-child,
+  .page-enter main > *,
+  .page-enter .rise-stagger > * {
     animation: none;
   }
 }

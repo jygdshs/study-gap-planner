@@ -87,7 +87,7 @@ export default function PlanPage() {
         </div>
       ) : (
         // 좁은 화면 순서: 우선순위 → 시간표 → 이행. 넓은 화면: 왼쪽에 우선순위·이행, 오른쪽에 시간표.
-        <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="rise-stagger grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <section className="sheet lg:col-start-1 lg:row-start-1" aria-labelledby="priority-title">
             <div className="sheet-head">
               <h2 id="priority-title" className="sheet-title">
