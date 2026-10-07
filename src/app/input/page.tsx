@@ -35,6 +35,8 @@ export default function InputPage() {
   // 개념 의미 유형
   const [conceptReference, setConceptReference] = useState("");
   const [conceptAnswer, setConceptAnswer] = useState("");
+  // 컨닝 방지: ① 기준 의미 쓰기 → (가림) ② 내 설명 쓰기 → ③ 채점 후에야 기준 의미·점수·틀린 이유 공개
+  const [conceptStep, setConceptStep] = useState<"reference" | "answer" | "graded">("reference");
 
   const [wrongReasons, setWrongReasons] = useState<string[]>([]);
 
@@ -72,6 +74,9 @@ export default function InputPage() {
     } else {
       if (!conceptReference.trim() || !conceptAnswer.trim()) {
         return "기준 의미와 채점할 의미를 모두 입력해 주세요.";
+      }
+      if (conceptStep !== "graded") {
+        return "내 설명을 쓰고 ‘채점하기’를 먼저 눌러 주세요.";
       }
     }
 
@@ -121,17 +126,44 @@ export default function InputPage() {
     setProblemsWrong("");
     setConceptReference("");
     setConceptAnswer("");
+    setConceptStep("reference");
     setWrongReasons([]);
+  };
+
+  // 개념 의미 단계 이동
+  const confirmReference = () => {
+    setConceptAnswer("");
+    setConceptStep("answer");
+    setMessage(null);
+  };
+  // 기준 의미를 다시 보면 내 설명은 지운다 (보고 쓰지 못하게)
+  const editReference = () => {
+    setConceptAnswer("");
+    setConceptStep("reference");
+    setMessage(null);
+  };
+  const gradeAnswer = () => {
+    setConceptStep("graded");
+    setMessage(null);
+  };
+  // 채점 뒤 다시 쓰기: 내 설명을 지우고 기준 의미를 다시 가린다
+  const rewriteAnswer = () => {
+    setConceptAnswer("");
+    setConceptStep("answer");
+    setMessage(null);
   };
 
   // 저장 전 미리보기: 이 기록 하나의 기본 점수(감점 전). scoring.ts와 같은 계산.
   const total = Number(problemsTotal);
   const correct = Number(problemsCorrect);
   // 9차시: 개념 의미는 핵심어 일치도로 채점 — 맞춘/빠진 핵심어도 함께 보여준다
+  //         단, 채점하기를 누르기 전에는 점수도 계산해서 보여주지 않는다 (힌트가 되지 않게)
   const conceptPreview =
-    recordType === "concept" && conceptReference.trim() && conceptAnswer.trim()
+    recordType === "concept" && conceptStep === "graded" && conceptReference.trim() && conceptAnswer.trim()
       ? keywordScore(conceptReference, conceptAnswer)
       : null;
+  // 개념 의미는 채점 전까지 점수·틀린 이유 칸을 숨긴다
+  const showResult = recordType === "problem" || conceptStep === "graded";
   const preview: { label: string; value: number } | null =
     recordType === "problem"
       ? problemsTotal !== "" && problemsCorrect !== "" && total > 0 && correct <= total
@@ -140,6 +172,44 @@ export default function InputPage() {
       : conceptPreview
         ? { label: "핵심어 일치도", value: conceptPreview.score }
         : null;
+
+  const scoreBlock = (
+    <div
+      className={`flex flex-col gap-2 ${
+        recordType === "concept" ? "border-y border-rule py-5" : "border-t border-rule pt-5"
+      }`}
+    >
+      <div className="flex items-baseline justify-between">
+        <span className="text-[13px] font-semibold text-ink-soft">
+          이 기록의 기본 점수 <span className="font-normal text-ink-muted">(감점 전)</span>
+        </span>
+        <span className="text-[22px] font-extrabold tracking-tight">
+          {preview ? (
+            <>
+              {preview.value}
+              <span className="ml-1 text-xs font-semibold text-ink-muted">{preview.label}</span>
+            </>
+          ) : (
+            <span className="text-ink-muted">—</span>
+          )}
+        </span>
+      </div>
+      <ScoreBar score={preview?.value ?? 0} />
+      {conceptPreview && <KeywordMatches matches={conceptPreview.matches} />}
+    </div>
+  );
+
+  const reasonsBlock = (
+    <div className="flex flex-col gap-2">
+      <span className="field-label">
+        틀린 이유{" "}
+        <span className="font-normal text-ink-muted">
+          {recordType === "concept" ? "빠진 핵심어를 보고 왜 놓쳤는지 3~4개" : "대표적인 이유 3~4개"}
+        </span>
+      </span>
+      <WrongReasonsInput value={wrongReasons} onChange={setWrongReasons} />
+    </div>
+  );
 
   const countFields = [
     { label: "문제 풀이 수", value: problemsTotal, set: setProblemsTotal },
@@ -244,59 +314,103 @@ export default function InputPage() {
               </div>
             ) : (
               <>
-                <label className="flex flex-col gap-2">
-                  <span className="field-label">기준 의미</span>
-                  <span className="field-hint">교과서나 인터넷에 있는 정확한 의미</span>
-                  <textarea
-                    value={conceptReference}
-                    onChange={(e) => setConceptReference(e.target.value)}
-                    rows={3}
-                    placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
-                    className="field resize-y leading-relaxed"
-                  />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="field-label">채점할 의미</span>
-                  <span className="field-hint">보지 않고 내가 이해한 대로 직접 작성</span>
-                  <textarea
-                    value={conceptAnswer}
-                    onChange={(e) => setConceptAnswer(e.target.value)}
-                    rows={3}
-                    placeholder="내가 이해한 개념의 의미를 적어 보세요."
-                    className="field resize-y leading-relaxed"
-                  />
-                </label>
+                {/* ① 기준 의미: 확정하면 가려지고, 채점한 뒤에 다시 보인다 */}
+                {conceptStep === "reference" ? (
+                  <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-2">
+                      <span className="field-label">① 기준 의미</span>
+                      <span className="field-hint">
+                        교과서나 인터넷에 있는 정확한 의미. 확정하면 가려지고 채점한 뒤에 다시 보여요.
+                      </span>
+                      <textarea
+                        value={conceptReference}
+                        onChange={(e) => setConceptReference(e.target.value)}
+                        rows={3}
+                        placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
+                        className="field resize-y leading-relaxed"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={confirmReference}
+                      disabled={!conceptReference.trim()}
+                      className="btn-primary self-start"
+                    >
+                      기준 의미 확정하고 내 설명 쓰기 <ArrowRightIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <span className="field-label">① 기준 의미</span>
+                    {conceptStep === "graded" ? (
+                      <p className="border border-rule bg-sheet-alt px-3 py-2.5 text-[15px] leading-relaxed">
+                        {conceptReference}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2 border border-dashed border-rule-strong px-3 py-3 text-[13px] text-ink-muted">
+                        <span>가려 두었어요 · 채점하면 보여요 ({conceptReference.trim().length}자)</span>
+                        <button
+                          type="button"
+                          onClick={editReference}
+                          title="기준 의미를 다시 보면 지금 쓴 내 설명은 지워져요"
+                          className="font-semibold text-accent hover:underline"
+                        >
+                          기준 의미 고치기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ② 채점할 의미: 기준 의미를 보지 않고 쓴다. 채점 뒤에는 고칠 수 없다 */}
+                {conceptStep !== "reference" && (
+                  <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-2">
+                      <span className="field-label">② 채점할 의미</span>
+                      <span className="field-hint">
+                        {conceptStep === "graded"
+                          ? "채점이 끝나 고칠 수 없어요. 다시 쓰려면 아래 ‘다시 쓰기’를 누르세요."
+                          : "기준 의미를 보지 않고 내가 이해한 대로 직접 써 보세요."}
+                      </span>
+                      <textarea
+                        value={conceptAnswer}
+                        onChange={(e) => setConceptAnswer(e.target.value)}
+                        readOnly={conceptStep === "graded"}
+                        rows={3}
+                        placeholder="내가 이해한 개념의 의미를 적어 보세요."
+                        autoFocus={conceptStep === "answer"}
+                        className={`field resize-y leading-relaxed ${conceptStep === "graded" ? "bg-sheet-alt" : ""}`}
+                      />
+                    </label>
+                    {conceptStep === "answer" ? (
+                      <button
+                        type="button"
+                        onClick={gradeAnswer}
+                        disabled={!conceptAnswer.trim()}
+                        className="btn-primary self-start"
+                      >
+                        채점하기
+                      </button>
+                    ) : (
+                      <button type="button" onClick={rewriteAnswer} className="btn-quiet self-start">
+                        다시 쓰기 <span className="font-normal text-ink-muted">기준 의미가 다시 가려져요</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
-            <div className="flex flex-col gap-2">
-              <span className="field-label">
-                틀린 이유 <span className="font-normal text-ink-muted">대표적인 이유 3~4개</span>
-              </span>
-              <WrongReasonsInput value={wrongReasons} onChange={setWrongReasons} />
-            </div>
+            {!showResult && (
+              <p className="border border-dashed border-rule-strong px-3 py-3 text-[13px] leading-relaxed text-ink-muted">
+                채점한 뒤에 기준 의미와 기본 점수, 맞춘·빠진 핵심어가 보이고 틀린 이유를 쓸 수 있어요.
+              </p>
+            )}
 
-            <div className="flex flex-col gap-2 border-t border-rule pt-5">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[13px] font-semibold text-ink-soft">
-                  이 기록의 기본 점수 <span className="font-normal text-ink-muted">(감점 전)</span>
-                </span>
-                <span className="text-[22px] font-extrabold tracking-tight">
-                  {preview ? (
-                    <>
-                      {preview.value}
-                      <span className="ml-1 text-xs font-semibold text-ink-muted">
-                        {preview.label}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-ink-muted">—</span>
-                  )}
-                </span>
-              </div>
-              <ScoreBar score={preview?.value ?? 0} />
-              {conceptPreview && <KeywordMatches matches={conceptPreview.matches} />}
-            </div>
+            {/* 개념 의미: 채점 결과(점수·핵심어)를 먼저 보고 틀린 이유를 쓴다 / 문제 풀이: 지금처럼 이유 → 점수 */}
+            {showResult && recordType === "concept" && scoreBlock}
+            {showResult && reasonsBlock}
+            {showResult && recordType === "problem" && scoreBlock}
 
             {message && (
               <div
@@ -314,8 +428,12 @@ export default function InputPage() {
               </div>
             )}
 
-            <button type="submit" disabled={submitting} className="btn-primary py-3.5 text-[15px]">
-              {submitting ? "저장 중…" : "학습 결과 저장하기"}
+            <button
+              type="submit"
+              disabled={submitting || !showResult}
+              className="btn-primary py-3.5 text-[15px]"
+            >
+              {submitting ? "저장 중…" : showResult ? "학습 결과 저장하기" : "채점한 뒤에 저장할 수 있어요"}
             </button>
           </div>
         </section>
