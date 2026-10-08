@@ -14,7 +14,7 @@
 //
 // 학습 점수는 0~100점이며, "점수가 낮을수록 우선적으로 학습해야 하는 단원/과목"이다.
 
-import type { RecordType, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
+import type { DaySchedule, RecordType, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
 import { keywordScore } from "@/lib/keywords";
 
 // ---------------------------------------------------------------------------
@@ -315,6 +315,8 @@ export interface PlanDay {
   // 하루 최대 2개 추천. carriedFrom: 그 날짜에 못 한 공부를 옮겨 온 칸 (planTracking.carryOverMissed)
   items: { subjectId: string; subjectName: string; unit: string; score: number; carriedFrom?: string }[];
   exams: { subjectId: string; subjectName: string }[]; // 그날 보는 시험
+  window: { start: string; end: string } | null; // 공부 시간대 "HH:MM" (정하지 않았으면 null)
+  special: { note: string | null } | null; // 특정 날 일정으로 바뀐 날이면 그 메모
 }
 
 // 같은 단원을 또 넣을 때마다 이만큼 점수를 더해서 비교한다.
@@ -332,16 +334,24 @@ export function buildStudyPlan(
   records: StudyRecord[],
   weeklyAvailability: WeeklyAvailability[],
   todayISOStr: string = todayISO(),
-  horizonDays: number = planHorizon(subjects, todayISOStr).days
+  horizonDays: number = planHorizon(subjects, todayISOStr).days,
+  daySchedules: DaySchedule[] = []
 ): PlanDay[] {
-  const hoursByDay = new Map(weeklyAvailability.map((w) => [w.day_of_week, w.available_hours]));
+  const weeklyByDay = new Map(weeklyAvailability.map((w) => [w.day_of_week, w]));
+  const specialByDate = new Map(daySchedules.map((d) => [d.date, d]));
+  const toWindow = (start?: string | null, end?: string | null) =>
+    start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null;
   const timesPlanned = new Map<string, number>();
   const days: PlanDay[] = [];
 
   for (let i = 0; i < horizonDays; i++) {
     const date = addDaysISO(todayISOStr, i);
     const dow = dayOfWeekMonFirst(date);
-    const availableHours = hoursByDay.get(dow) ?? 0;
+    // 특정 날 일정이 있으면 그날은 요일별 설정 대신 그 값을 쓴다
+    const special = specialByDate.get(date);
+    const weekly = weeklyByDay.get(dow);
+    const availableHours = Number(special ? special.available_hours : (weekly?.available_hours ?? 0));
+    const window = special ? toWindow(special.start_time, special.end_time) : toWindow(weekly?.start_time, weekly?.end_time);
 
     const exams = subjects
       .filter((s) => s.exam_date === date)
@@ -377,7 +387,15 @@ export function buildStudyPlan(
 
     // 하루 안에서는 더 취약한(점수가 낮은) 단원을 1교시에
     items.sort((a, b) => a.score - b.score);
-    days.push({ date, dayLabel: DAY_LABELS_FULL[dow], availableHours, items, exams });
+    days.push({
+      date,
+      dayLabel: DAY_LABELS_FULL[dow],
+      availableHours,
+      items,
+      exams,
+      window: availableHours > 0 ? window : null,
+      special: special ? { note: special.note } : null,
+    });
   }
 
   return days;

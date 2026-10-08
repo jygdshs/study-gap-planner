@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
-import type { PlanItem, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
+import type { DaySchedule, PlanItem, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
 import {
   addDaysISO,
   buildStudyPlan,
@@ -34,6 +34,8 @@ export function usePlanData() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [records, setRecords] = useState<StudyRecord[]>([]);
   const [availability, setAvailability] = useState<WeeklyAvailability[]>([]);
+  // 특정 날 일정 (005 마이그레이션 전이면 빈 목록)
+  const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,11 @@ export function usePlanData() {
           .select("planned_minutes, actual_minutes")
           .limit(1)
           .then(({ error }) => setHasTimeColumns(!error)),
+        supabase
+          .from("day_schedules")
+          .select("*")
+          .gte("date", today)
+          .then(({ data, error }) => setDaySchedules(error ? [] : ((data as DaySchedule[]) ?? []))),
       ]);
 
       const firstError = subjectsRes.error ?? recordsRes.error ?? availabilityRes.error;
@@ -103,7 +110,14 @@ export function usePlanData() {
   const unitStatuses = buildUnitStatuses(activeSubjects, records);
   const subjectPriorities = buildSubjectPriorities(activeSubjects, unitStatuses);
   const horizon = planHorizon(subjects, today);
-  const basePlanDays: PlanDay[] = buildStudyPlan(subjects, records, availability, today, horizon.days);
+  const basePlanDays: PlanDay[] = buildStudyPlan(
+    subjects,
+    records,
+    availability,
+    today,
+    horizon.days,
+    daySchedules
+  );
   const noStudyHours = availability.every((w) => !w.available_hours);
   const colors = buildSubjectColorMap(subjects);
   const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));

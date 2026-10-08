@@ -9,6 +9,7 @@ import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
 import Timetable from "@/components/Timetable";
 import TimeLogSection from "@/components/TimeLogSection";
+import DayTimeline from "@/components/DayTimeline";
 import { buildExportDays, downloadPlanImage, downloadPlanPdf } from "@/lib/exportPlan";
 import { ArrowRightIcon, CheckIcon, RefreshIcon } from "@/components/Icons";
 import {
@@ -52,6 +53,7 @@ export default function PlanPage() {
   } = data;
   const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [timelineDate, setTimelineDate] = useState<string | null>(null);
 
   // 계획 기간이 7일보다 길면(시험 일정) 한 주씩 나눠 보여준다
   const weeks: (typeof planDays)[] = [];
@@ -60,6 +62,9 @@ export default function PlanPage() {
   const currentWeek = weeks[Math.min(weekIdx, weeks.length - 1)] ?? [];
 
   const upToDate = hasSavedPlan && !planOutdated;
+  // 하루 시간표: 고른 날이 지금 주에 없으면 오늘(없으면 그 주 첫날)
+  const timelineDay =
+    currentWeek.find((d) => d.date === timelineDate) ?? currentWeek.find((d) => d.date === today) ?? currentWeek[0];
   const weekRange = `${shortDate(planDays[0].date)} – ${shortDate(planDays[planDays.length - 1].date)}`;
   const periodNote = horizon.lastExamDate
     ? `마지막 시험 ${shortDate(horizon.lastExamDate)} 전날까지 · ${planDays.length}일`
@@ -236,6 +241,44 @@ export default function PlanPage() {
                 </p>
               )}
             </section>
+
+            {timelineDay && (
+              <section className="sheet" aria-labelledby="timeline-title">
+                <div className="sheet-head">
+                  <h2 id="timeline-title" className="sheet-title">
+                    하루 시간표
+                  </h2>
+                  <Link href="/availability" className="text-[13px] font-semibold text-accent hover:underline">
+                    시간대 · 특정 날 일정
+                  </Link>
+                </div>
+                <div role="tablist" aria-label="날짜 선택" className="flex gap-1 overflow-x-auto px-5 pt-4">
+                  {currentWeek.map((d) => {
+                    const active = d.date === timelineDay.date;
+                    return (
+                      <button
+                        key={d.date}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setTimelineDate(d.date)}
+                        className={`flex shrink-0 flex-col items-center border px-2.5 py-1 ${
+                          active ? "border-mark bg-mark text-on-mark" : "border-rule-strong bg-sheet hover:border-ink"
+                        }`}
+                      >
+                        <span className="text-[14px] font-bold leading-tight">{d.dayLabel}</span>
+                        <span className={`text-[11px] ${active ? "text-on-mark/75" : d.special ? "font-bold text-warn" : "text-ink-muted"}`}>
+                          {d.date === today ? "오늘" : shortDate(d.date)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="p-5">
+                  <DayTimeline key={timelineDay.date} data={data} day={timelineDay} />
+                </div>
+              </section>
+            )}
 
             {!planError && pastDates.length > 0 && (
               <section className="sheet" aria-labelledby="past-title">

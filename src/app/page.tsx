@@ -6,6 +6,7 @@ import { colorOf, completedFill, subjectInk } from "@/lib/palette";
 import { DAY_LABELS_FULL, dayOfWeekMonFirst } from "@/lib/scoring";
 import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
+import DayTimeline from "@/components/DayTimeline";
 import { ArrowRightIcon } from "@/components/Icons";
 import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader } from "@/components/ui";
 
@@ -142,6 +143,12 @@ export default function HomePage() {
                     <PlanCell key={`${slot}-empty`} kind="empty" />
                   );
                 })}
+              </div>
+            )}
+            {!restToday && (
+              <div className="border-t border-rule pt-3">
+                <h3 className="mb-2 text-[14px] font-bold">오늘 시간표</h3>
+                <DayTimeline data={data} day={todayPlan} compact />
               </div>
             )}
             <p className="text-[13px] leading-relaxed text-ink-muted">

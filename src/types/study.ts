@@ -38,7 +38,20 @@ export const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"] as c
 export interface WeeklyAvailability {
   day_of_week: number; // 0(월) ~ 6(일)
   available_hours: number;
+  // 005 마이그레이션: 공부 시간대 "HH:MM" 또는 "HH:MM:SS" (없으면 시간대 없이 시간만)
+  start_time?: string | null;
+  end_time?: string | null;
   updated_at: string;
+}
+
+// 특정 날 일정: 그날만 요일별 공부 시간 대신 쓴다
+export interface DaySchedule {
+  date: string; // YYYY-MM-DD
+  available_hours: number;
+  start_time: string | null;
+  end_time: string | null;
+  note: string | null;
+  created_at: string;
 }
 
 // 실제 시험 성적 (학습 점수 예측과 비교)

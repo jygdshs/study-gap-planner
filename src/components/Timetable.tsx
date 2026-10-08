@@ -117,6 +117,11 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-[12px] leading-tight text-ink-muted lg:text-[13px]">
           <span className="whitespace-nowrap font-bold text-ink-soft">{day.availableHours}시간</span>
+          {day.window && (
+            <span className="whitespace-nowrap tabular-nums">
+              {day.window.start}–{day.window.end}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -152,6 +157,16 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
                       {ex.subjectName} 시험
                     </span>
                   ))}
+                  {day.special && (
+                    <span
+                      title={day.special.note ? `특정 날 일정: ${day.special.note}` : "특정 날 일정"}
+                      className={`mt-0.5 max-w-full truncate border px-1.5 py-px text-[11px] font-bold lg:text-[12px] ${
+                        isToday ? "border-on-mark/60" : "border-warn text-warn"
+                      }`}
+                    >
+                      {day.special.note || "일정 변경"}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -237,6 +252,16 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
                     {ex.subjectName}
                   </span>
                 ))}
+                {day.special && (
+                  <span
+                    title={day.special.note ? `특정 날 일정: ${day.special.note}` : "특정 날 일정"}
+                    className={`mt-1 w-full truncate border px-0.5 text-center text-[11px] font-bold ${
+                      isToday ? "border-on-mark/60" : "border-warn text-warn"
+                    }`}
+                  >
+                    {day.special.note || "변경"}
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 {isRestDay(day) ? (
