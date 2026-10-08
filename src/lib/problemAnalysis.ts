@@ -65,7 +65,16 @@ export const ANALYSIS_SCHEMA = {
   },
 };
 
-/** "3, 7, 12-14" → ["3","7","12","13","14"] (중복 제거, 입력 순서 유지) */
+/**
+ * 문항 번호를 같은 모양으로: "009." "09번" "문9" "9)" → "9", "5-2"는 그대로.
+ * 문제집 PDF는 번호를 001, 002처럼 0을 붙여 적는 경우가 많아, 0을 떼고 비교한다.
+ */
+export function normalizeProblemNo(raw: string): string {
+  const s = String(raw).trim().replace(/^(문항|문제|문)\s*/, "").replace(/[.)\]번\s]+$/, "").replace(/^[\[(]/, "");
+  return s.replace(/(^|[^\d])0+(?=\d)/g, "$1");
+}
+
+/** "3, 7, 12-14" → ["3","7","12","13","14"] (중복 제거, 입력 순서 유지, 앞의 0은 뗌) */
 export function parseNumbers(input: string): string[] {
   const out: string[] = [];
   for (const raw of input.split(/[,\s]+/)) {
@@ -80,7 +89,7 @@ export function parseNumbers(input: string): string[] {
       out.push(part);
     }
   }
-  return [...new Set(out)];
+  return [...new Set(out.map(normalizeProblemNo).filter(Boolean))];
 }
 
 /** "1-4, 7" → [1,2,3,4,7] (쪽 번호, 1부터) */

@@ -10,6 +10,7 @@ import {
   CAUSES,
   MAX_PDF_BASE64,
   MAX_WRONG,
+  normalizeProblemNo,
   parseNumbers,
   parsePages,
   typeStats,
@@ -166,7 +167,8 @@ export default function AnalyzePage() {
 
       const problems = (json.problems as AnalyzedProblem[]) ?? [];
       // 학생이 적은 번호 순서대로, AI가 빠뜨린 번호도 빈 줄로 채운다
-      const byNo = new Map(problems.map((p) => [p.number, p]));
+      // AI가 "009"처럼 돌려줘도 학생이 적은 "9"와 맞춰 본다
+      const byNo = new Map(problems.map((p) => [normalizeProblemNo(p.number), p]));
       setRows(
         numbers.map((n) => {
           const p = byNo.get(n);
