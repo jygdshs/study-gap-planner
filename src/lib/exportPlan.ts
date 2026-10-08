@@ -4,6 +4,8 @@
 
 import type { PlanData } from "@/lib/usePlanData";
 import { colorOf } from "@/lib/palette";
+import { formatClock } from "@/lib/schedule";
+import { daySchedule } from "@/lib/dayCells";
 
 export interface ExportCell {
   subjectName: string;
@@ -13,15 +15,17 @@ export interface ExportCell {
   saved: boolean;
   completed: boolean;
   carried: boolean;
+  times: string | null; // 공부 시간대가 있으면 이 과목을 공부하는 시각 "19:00–19:35 · 19:55–20:30"
 }
 
 export interface ExportDay {
   date: string;
   dayLabel: string;
   hours: number;
+  window: string | null; // "19:00–22:00"
   exams: { name: string; color: string }[];
   rest: boolean;
-  cells: (ExportCell | null)[]; // [1교시, 2교시]
+  cells: (ExportCell | null)[]; // [첫 과목, 둘째 과목]
 }
 
 export const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
@@ -30,6 +34,14 @@ export function buildExportDays(data: PlanData): ExportDay[] {
   const { planDays, savedAt, minutesFor, colors, subjectNameById, isRestDay } = data;
   return planDays.map((day) => {
     const minutes = minutesFor(day);
+    const plan = daySchedule(data, day);
+    const timesOf = (slot: number) =>
+      plan
+        ? plan.blocks
+            .filter((b) => b.kind === "study" && b.slot === slot)
+            .map((b) => `${formatClock(b.start)}–${formatClock(b.end)}`)
+            .join(" · ") || null
+        : null;
     const cells = [0, 1].map((slot): ExportCell | null => {
       const saved = savedAt(day.date, slot);
       const rec = day.items[slot];
@@ -44,12 +56,14 @@ export function buildExportDays(data: PlanData): ExportDay[] {
         saved: Boolean(saved),
         completed: Boolean(saved?.completed),
         carried: Boolean(rec?.carriedFrom && rec.subjectId === subjectId && rec.unit === unit),
+        times: timesOf(slot),
       };
     });
     return {
       date: day.date,
       dayLabel: day.dayLabel,
       hours: day.availableHours,
+      window: day.window ? `${day.window.start}–${day.window.end}` : null,
       exams: day.exams.map((e) => ({ name: e.subjectName, color: colorOf(colors, e.subjectId) })),
       rest: isRestDay(day),
       cells,
@@ -162,7 +176,7 @@ export async function drawPlanImage(
     ctx.font = `600 13px ${FONT}`;
     ctx.textAlign = "center";
     ctx.fillText(`${firstWeek + wi}주차`, x0 + LABEL / 2, y0 + HEAD_H / 2 + 5);
-    ["1교시", "2교시"].forEach((t, i) => ctx.fillText(t, x0 + LABEL / 2, y0 + HEAD_H + SLOT_H * i + SLOT_H / 2 + 5));
+    ["첫 과목", "둘째 과목"].forEach((t, i) => ctx.fillText(t, x0 + LABEL / 2, y0 + HEAD_H + SLOT_H * i + SLOT_H / 2 + 5));
     ctx.fillText("시간", x0 + LABEL / 2, y0 + HEAD_H + SLOT_H * 2 + HOURS_H / 2 + 5);
 
     week.forEach((day, di) => {
@@ -239,7 +253,10 @@ export async function drawPlanImage(
           ctx.font = `700 15px ${FONT}`;
           const lines = wrap(ctx, cell.unit, bw - 16, 2);
           lines.forEach((l, li) => ctx.fillText(l, bx + 8, by + 40 + li * 19));
-          if (cell.minutes) {
+          if (cell.times) {
+            ctx.font = `600 11px ${FONT}`;
+            ctx.fillText(cell.times, bx + 8, by + bh - 8, bw - 16);
+          } else if (cell.minutes) {
             ctx.font = `600 12px ${FONT}`;
             ctx.fillText(`${cell.minutes}분`, bx + 8, by + bh - 8);
           }
@@ -260,7 +277,7 @@ export async function drawPlanImage(
       ctx.textAlign = "center";
       ctx.fillStyle = PAPER.soft;
       ctx.font = `700 13px ${FONT}`;
-      ctx.fillText(`${day.hours}시간`, cx + colW / 2, y0 + HEAD_H + SLOT_H * 2 + HOURS_H / 2 + 5);
+      ctx.fillText(`${day.hours}시간${day.window ? ` · ${day.window}` : ""}`, cx + colW / 2, y0 + HEAD_H + SLOT_H * 2 + HOURS_H / 2 + 5, colW - 8);
     });
 
     // 괘선

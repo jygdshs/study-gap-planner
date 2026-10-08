@@ -1,19 +1,25 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import PlanCell from "@/components/PlanCell";
-import { colorOf } from "@/lib/palette";
+import DayTimeline from "@/components/DayTimeline";
+import { CheckIcon } from "@/components/Icons";
+import { colorOf, completedFill, subjectInk } from "@/lib/palette";
+import { formatClock } from "@/lib/schedule";
+import { dayCells, daySchedule } from "@/lib/dayCells";
 import type { PlanDay } from "@/lib/scoring";
 import type { PlanData } from "@/lib/usePlanData";
 
-// 7일 × 2교시 시간표. 넓은 화면은 격자, 좁은 화면은 요일별 행.
-//  - 오늘 열은 머리부터 시간 줄까지 하나로 이어진 진남색 틀
-//  - 쉬는 날은 두 교시를 합친 빗금 칸
+// 한 주 시간표. 넓은 화면은 격자, 좁은 화면은 요일별 행.
+//  - 공부 시간대가 있으면 세로축이 실제 시각: 공부 블록과 쉬는 시간이 몇 시에 있는지 그대로 보인다
+//  - 시간대가 하나도 없으면 요일 × 과목 칸(첫 과목·둘째 과목)으로 보여주고 시간대를 정하라고 안내
+//  - 오늘 열은 머리부터 시간 줄까지 하나로 이어진 진남색 틀, 쉬는 날은 빗금
 //  - 각 열 바닥: 공부 가능 시간 용량 막대(칸에 배정된 시간 비율대로 과목 색으로 나눠 채움)
 
 const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
 
-const LABEL_COL = 52; // px, 교시 표시 열
+const LABEL_COL = 52; // px, 시각(또는 과목 칸 이름) 표시 열
 
 /**
  * days: 이번에 보여줄 날짜들(최대 7일, 한 주). 계획 기간이 길면 plan 화면이 주 단위로 잘라서 넘긴다.
@@ -127,9 +133,145 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
     );
   };
 
+  // ---------------------------------------------------------------------------
+  // 시간 축: 그 주에 시간대가 있는 날이 하나라도 있으면, 칸을 실제 시각 위치에 놓는다.
+  // 축은 그 주의 가장 이른 시작 ~ 가장 늦은 끝(정시로 맞춤). 높이는 대략 600px이 되도록 분당 px를 정한다.
+  // ---------------------------------------------------------------------------
+  const schedules = new Map(planDays.map((d) => [d.date, daySchedule(data, d)]));
+  const timed = [...schedules.values()].filter((s) => s !== null);
+  const axis = (() => {
+    if (timed.length === 0) return null;
+    const first = Math.min(...timed.map((s) => s!.blocks[0]?.start ?? Infinity));
+    const last = Math.max(...timed.map((s) => s!.blocks[s!.blocks.length - 1]?.end ?? -Infinity));
+    if (!isFinite(first) || !isFinite(last)) return null;
+    const start = Math.floor(first / 60) * 60;
+    const end = Math.max(start + 60, Math.ceil(last / 60) * 60);
+    const ppm = Math.min(2, Math.max(1, 600 / (end - start)));
+    const hours = Array.from({ length: (end - start) / 60 + 1 }, (_, i) => start / 60 + i);
+    return { start, end, ppm, height: (end - start) * ppm, hours };
+  })();
+  // 정시마다 옅은 가로줄 (축 시작이 정시라 0px부터 60분 간격)
+  const hourLines = axis
+    ? {
+        backgroundImage: `repeating-linear-gradient(to bottom, rgb(var(--c-rule) / 0.7) 0 1px, transparent 1px ${60 * axis.ppm}px)`,
+      }
+    : undefined;
+
+  const renderTimeColumn = (day: PlanDay, di: number) => {
+    if (!axis) return null;
+    if (isRestDay(day)) {
+      return (
+        <div className="absolute inset-1">
+          <PlanCell kind="rest" animate delay={delayFor(di, 0)} />
+        </div>
+      );
+    }
+    const plan = schedules.get(day.date);
+    const cells = dayCells(data, day);
+    // 시간대를 안 정한 날: 위쪽에 과목 칸만 쌓고 '시간대 미정'
+    if (!plan) {
+      return (
+        <div className="absolute inset-x-1 top-1 flex flex-col gap-1">
+          <span className="text-center text-[11px] font-semibold text-ink-muted">시간대 미정</span>
+          {renderCell(day, 0, true)}
+          {renderCell(day, 1, true)}
+        </div>
+      );
+    }
+    return plan.blocks.map((b, bi) => {
+      const top = (b.start - axis.start) * axis.ppm;
+      const height = Math.max(14, (b.end - b.start) * axis.ppm - 2);
+      const time = `${formatClock(b.start)}–${formatClock(b.end)}`;
+      const motion = settled.current ? undefined : { animationDelay: `${120 + di * 70 + bi * 40}ms` };
+      if (b.kind !== "study") {
+        if (b.kind === "free") return null;
+        return (
+          <div
+            key={b.start}
+            title={`${time} 쉬는 시간`}
+            className="cell-fill absolute inset-x-1 flex items-center justify-center overflow-hidden text-[11px] text-ink-muted"
+            style={{
+              ...motion,
+              top,
+              height,
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgb(var(--c-ground)) 0 4px, transparent 4px 8px)",
+            }}
+          >
+            {height >= 16 && `쉬기 ${b.end - b.start}분`}
+          </div>
+        );
+      }
+      const cell = cells[b.slot ?? 0];
+      if (!cell) return null;
+      const ink = subjectInk(cell.color);
+      const checkable = Boolean(cell.saved) && day.date <= today;
+      const style = cell.saved
+        ? cell.completed
+          ? { backgroundColor: completedFill(cell.color), color: ink }
+          : { backgroundColor: cell.color, color: "#fff" }
+        : { backgroundColor: "rgb(var(--c-sheet))", color: ink, borderColor: ink }; // 추천 칸: 점선 테두리
+      const label = `${time} ${cell.name} ${cell.unit}${cell.saved ? (cell.completed ? " 완료" : "") : " 추천"}`;
+      const body = (
+        <>
+          <span className="block text-[11px] font-semibold leading-tight tabular-nums opacity-90 lg:text-[12px]">
+            {height >= 40 ? time : formatClock(b.start)}
+          </span>
+          <span
+            className={`block truncate text-[12px] font-bold leading-tight lg:text-[13px] ${cell.completed ? "line-through" : ""}`}
+          >
+            {height >= 58 ? cell.name + " " : ""}
+            {cell.unit}
+            {(b.parts ?? 1) > 1 && (
+              <span className="ml-1 text-[10px] font-semibold opacity-80 lg:text-[11px]">
+                {b.part}/{b.parts}
+              </span>
+            )}
+          </span>
+          {cell.carriedFrom && height >= 58 && <span className="block text-[10px] font-bold">이월</span>}
+          {cell.completed && (
+            <CheckIcon className="absolute right-1 top-1 h-3.5 w-3.5" aria-hidden />
+          )}
+        </>
+      );
+      const base = "cell-fill absolute inset-x-1 overflow-hidden px-1.5 py-1 text-left";
+      return checkable ? (
+        <button
+          key={b.start}
+          type="button"
+          title={`${label} — 눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`}
+          aria-label={`${label} ${cell.completed ? "완료 취소" : "완료 체크"}`}
+          aria-pressed={cell.completed}
+          onClick={() => toggleItem(cell.saved!)}
+          className={`${base} transition-[filter] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
+          style={{ ...style, ...motion, top, height }}
+        >
+          {body}
+        </button>
+      ) : (
+        <div
+          key={b.start}
+          title={cell.saved ? `${label} (그날이 되면 체크할 수 있어요)` : `${label} — 저장하면 체크할 수 있어요`}
+          className={`${base} ${cell.saved ? "" : "border border-dashed"}`}
+          style={{ ...style, ...motion, top, height }}
+        >
+          {body}
+        </div>
+      );
+    });
+  };
+
   return (
     <>
-      {/* 넓은 화면: 요일 × 교시 격자 */}
+      {!axis && planDays.some((d) => !isRestDay(d)) && (
+        <p className="mx-5 mt-5 text-[13px] text-ink-soft">
+          공부 시간대를 정하면 시간표가 몇 시부터 몇 시까지 공부하고 쉬는지로 바뀌어요.{" "}
+          <Link href="/availability" className="font-semibold text-accent hover:underline">
+            시간대 정하기
+          </Link>
+        </p>
+      )}
+      {/* 넓은 화면: 요일 × 시각 격자 (시간대가 없으면 요일 × 과목 칸) */}
       <div className="hidden p-5 md:block">
         <div className="relative">
           <div
@@ -171,33 +313,55 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
               );
             })}
 
-            {/* 1교시 줄 (쉬는 날은 두 교시를 합친 칸) */}
-            <div className="flex items-center justify-center bg-sheet text-[12px] font-semibold text-ink-muted lg:text-[13px]">
-              1교시
-            </div>
-            {planDays.map((day) =>
-              isRestDay(day) ? (
-                <div key={day.date} className="row-span-2 bg-sheet p-1">
-                  <PlanCell kind="rest" animate delay={delayFor(planDays.indexOf(day), 0)} />
+            {axis ? (
+              <>
+                {/* 시각 눈금 열 */}
+                <div className="relative bg-sheet" style={{ height: axis.height }}>
+                  {axis.hours.map((h) => (
+                    <span
+                      key={h}
+                      className="absolute right-1.5 -translate-y-1/2 text-[11px] tabular-nums text-ink-muted lg:text-[12px]"
+                      style={{ top: (h * 60 - axis.start) * axis.ppm }}
+                    >
+                      {String(h).padStart(2, "0")}:00
+                    </span>
+                  ))}
                 </div>
-              ) : (
-                <div key={day.date} className="bg-sheet p-1">
-                  {renderCell(day, 0)}
+                {planDays.map((day, di) => (
+                  <div key={day.date} className="relative bg-sheet" style={{ height: axis.height, ...hourLines }}>
+                    {renderTimeColumn(day, di)}
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                {/* 시간대가 하나도 없는 주: 과목 칸 두 줄 (쉬는 날은 두 줄을 합친 칸) */}
+                <div className="flex items-center justify-center bg-sheet px-1 text-center text-[12px] font-semibold leading-tight text-ink-muted lg:text-[13px]">
+                  첫 과목
                 </div>
-              )
+                {planDays.map((day) =>
+                  isRestDay(day) ? (
+                    <div key={day.date} className="row-span-2 bg-sheet p-1">
+                      <PlanCell kind="rest" animate delay={delayFor(planDays.indexOf(day), 0)} />
+                    </div>
+                  ) : (
+                    <div key={day.date} className="bg-sheet p-1">
+                      {renderCell(day, 0)}
+                    </div>
+                  )
+                )}
+                <div className="flex items-center justify-center bg-sheet px-1 text-center text-[12px] font-semibold leading-tight text-ink-muted lg:text-[13px]">
+                  둘째 과목
+                </div>
+                {planDays
+                  .filter((day) => !isRestDay(day))
+                  .map((day) => (
+                    <div key={day.date} className="bg-sheet p-1">
+                      {renderCell(day, 1)}
+                    </div>
+                  ))}
+              </>
             )}
-
-            {/* 2교시 줄 */}
-            <div className="flex items-center justify-center bg-sheet text-[12px] font-semibold text-ink-muted lg:text-[13px]">
-              2교시
-            </div>
-            {planDays
-              .filter((day) => !isRestDay(day))
-              .map((day) => (
-                <div key={day.date} className="bg-sheet p-1">
-                  {renderCell(day, 1)}
-                </div>
-              ))}
 
             <div className="flex items-center justify-center bg-sheet text-[12px] font-semibold text-ink-muted lg:text-[13px]">
               시간
@@ -266,6 +430,8 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
               <div className="flex flex-col gap-2">
                 {isRestDay(day) ? (
                   <PlanCell kind="rest" compact animate delay={delayFor(planDays.indexOf(day), 0)} />
+                ) : day.window ? (
+                  <DayTimeline data={data} day={day} compact showSummary={false} />
                 ) : (
                   <div className="grid grid-cols-2 gap-1.5">
                     {renderCell(day, 0, true)}
