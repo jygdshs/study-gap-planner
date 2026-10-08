@@ -5,7 +5,7 @@
 //  - 로그인한 사용자만 쓸 수 있다: 요청에 붙은 Supabase 로그인 토큰을 확인한다.
 //  - 하루 DAILY_LIMIT번까지 (ai_usage 테이블). PDF는 저장하지 않고, Gemini에도 저장하지 말라고(store: false) 보낸다.
 
-import { ApiError, GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import {
   ANALYSIS_SCHEMA,
@@ -40,6 +40,29 @@ const SYSTEM_PROMPT = `너는 고등학생이 푼 문제 PDF에서, 학생이 �
 - confidence: 문항을 확실히 찾고 유형이 분명하면 high, 수식이 깨져 보이거나 애매하면 low.
 
 note에는 학생이 알아야 할 점(못 찾은 번호, 글자가 깨진 쪽 등)을 한두 문장으로 쓴다. 문제가 없으면 빈 문자열.`;
+
+/**
+ * Gemini 오류에서 상태 코드·사유·메시지를 꺼낸다.
+ * Interactions API는 BadRequestError 같은 자체 오류를 던지고, 본문(body)에 JSON 문자열로
+ * [{ error: { code, message, status, details: [{ reason }] } }] 형태의 내용이 들어 있다.
+ */
+function readGeminiError(error: unknown): { status?: number; reason?: string; message: string } {
+  const e = error as { status?: number; statusCode?: number; body?: unknown; message?: string; cause?: { message?: string } };
+  const status = e?.status ?? e?.statusCode;
+  let reason: string | undefined;
+  let message = e?.message ?? String(error);
+  try {
+    const raw = typeof e?.body === "string" ? JSON.parse(e.body) : e?.body;
+    const err = (Array.isArray(raw) ? raw[0] : raw)?.error;
+    if (err?.message) message = err.message;
+    reason =
+      (err?.details as { reason?: string }[] | undefined)?.find((d) => d?.reason)?.reason ?? err?.status ?? undefined;
+  } catch {
+    // 본문이 JSON이 아니면 원래 메시지를 쓴다
+  }
+  if (!status && e?.cause?.message) message = `${message} (${e.cause.message})`;
+  return { status, reason, message: String(message).slice(0, 300) };
+}
 
 function fail(message: string, status = 400) {
   return Response.json({ error: message }, { status });
@@ -123,15 +146,22 @@ export async function POST(req: Request) {
     });
     text = interaction.output_text;
   } catch (error) {
-    if (error instanceof ApiError) {
-      if (error.status === 429) return fail("Gemini 무료 사용 한도에 걸렸어요. 잠시(또는 내일) 뒤 다시 해 주세요.", 429);
-      if (error.status === 400) return fail(`Gemini 요청 오류: ${error.message}`, 400);
-      if (error.status === 401 || error.status === 403) {
-        return fail("Gemini API 키가 올바르지 않거나, 이 계정에서 API 사용이 막혀 있어요.", 500);
-      }
-      return fail(`Gemini 서버 오류 (${error.status}). 잠시 뒤 다시 해 주세요.`, 502);
+    const { status, reason, message } = readGeminiError(error);
+    // Vercel > Logs에서 원인을 볼 수 있게 남긴다 (키는 들어 있지 않음)
+    console.error("[analyze-problems] Gemini error", { status, reason, message, model: MODEL });
+    if (reason === "API_KEY_INVALID") {
+      return fail("Gemini API 키가 올바르지 않아요. Vercel 환경변수의 GEMINI_API_KEY 값을 다시 확인해 주세요.", 500);
     }
-    return fail("Gemini 서버에 연결하지 못했어요.", 502);
+    if (status === 429) return fail("Gemini 무료 사용 한도에 걸렸어요. 잠시(또는 내일) 뒤 다시 해 주세요.", 429);
+    if (status === 401 || status === 403) {
+      return fail(`이 계정에서 Gemini API를 쓸 수 없어요. 학교 계정이면 관리자가 막아 두었을 수 있어요. (${message})`, 500);
+    }
+    if (status === 404) {
+      return fail(`모델(${MODEL})을 찾을 수 없어요. GEMINI_MODEL 환경변수로 다른 모델을 지정해 주세요. (${message})`, 500);
+    }
+    if (status && status < 500) return fail(`Gemini 요청 오류 (${status}): ${message}`, 400);
+    if (status) return fail(`Gemini 서버 오류 (${status}). 잠시 뒤 다시 해 주세요. (${message})`, 502);
+    return fail(`Gemini 서버에 연결하지 못했어요. (${message})`, 502);
   }
 
   let parsed: AnalysisResponse;
