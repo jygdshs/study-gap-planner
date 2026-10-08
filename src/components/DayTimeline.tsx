@@ -23,7 +23,7 @@ export default function DayTimeline({
   compact?: boolean;
   showSummary?: boolean;
 }) {
-  const { isRestDay, toggleItem, today } = data;
+  const { isRestDay, toggleItem, today, weakTypeOf } = data;
 
   if (isRestDay(day)) {
     return <p className="text-[14px] text-ink-muted">쉬는 날이에요{day.special?.note ? ` (${day.special.note})` : ""}.</p>;
@@ -96,6 +96,17 @@ export default function DayTimeline({
                   </span>
                 )}
                 {cell.carriedFrom && <span className="ml-1.5 text-[11px] font-bold text-warn">이월</span>}
+                {(() => {
+                  const weak = weakTypeOf(cell.subjectId, cell.unit);
+                  return weak ? (
+                    <span
+                      className="ml-1.5 text-[12px] text-ink-soft"
+                      title={`최근 ${weak.type} 문항 ${weak.total}개 중 ${weak.wrong}개 틀림${weak.topCause ? ` (주로 ${weak.topCause})` : ""}`}
+                    >
+                      · {weak.type} 위주
+                    </span>
+                  ) : null;
+                })()}
                 {!cell.saved && <span className="ml-1.5 text-[11px] text-ink-muted">추천</span>}
               </span>
               <span className="flex items-center gap-2 text-[13px] font-semibold tabular-nums">

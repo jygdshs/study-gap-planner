@@ -211,7 +211,8 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
           ? { backgroundColor: completedFill(cell.color), color: ink }
           : { backgroundColor: cell.color, color: "#fff" }
         : { backgroundColor: "rgb(var(--c-sheet))", color: ink, borderColor: ink }; // 추천 칸: 점선 테두리
-      const label = `${time} ${cell.name} ${cell.unit}${cell.saved ? (cell.completed ? " 완료" : "") : " 추천"}`;
+      const weak = data.weakTypeOf(cell.subjectId, cell.unit);
+      const label = `${time} ${cell.name} ${cell.unit}${weak ? ` (${weak.type} 위주)` : ""}${cell.saved ? (cell.completed ? " 완료" : "") : " 추천"}`;
       const body = (
         <>
           <span className="block text-[11px] font-semibold leading-tight tabular-nums opacity-90 lg:text-[12px]">

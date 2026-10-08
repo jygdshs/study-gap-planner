@@ -54,6 +54,18 @@ export interface DaySchedule {
   created_at: string;
 }
 
+// AI 문제 유형 분석: 학습 기록 한 건에 달린 문항별 결과 (006 마이그레이션)
+export interface ProblemResult {
+  id: string;
+  record_id: string;
+  problem_no: string;
+  correct: boolean;
+  problem_type: string;
+  cause: string | null; // 계산 실수 / 개념 부족 / 문제 이해 / 시간 부족 / 기타 (맞은 문항은 null)
+  detail: string | null;
+  created_at: string;
+}
+
 // 실제 시험 성적 (학습 점수 예측과 비교)
 export interface ExamResult {
   id: string;

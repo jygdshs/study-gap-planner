@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
-import type { StudyRecord, Subject } from "@/types/study";
+import type { ProblemResult, StudyRecord, Subject } from "@/types/study";
+import { typeStats } from "@/lib/problemAnalysis";
 import { buildUnitStatuses, scoreOfRecord, todayISO, type UnitStatus } from "@/lib/scoring";
 import { buildSubjectColorMap, colorOf, scoreColor, scoreTextColor } from "@/lib/palette";
 import { keywordScore } from "@/lib/keywords";
@@ -29,6 +30,8 @@ const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slic
 export default function ScoresPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [records, setRecords] = useState<StudyRecord[]>([]);
+  // AI 문제 유형 분석 결과 (006 마이그레이션 전이면 빈 목록)
+  const [problemResults, setProblemResults] = useState<ProblemResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -38,10 +41,12 @@ export default function ScoresPage() {
     if (!quiet) setLoading(true);
     setError(null);
 
-    const [subjectsRes, recordsRes] = await Promise.all([
+    const [subjectsRes, recordsRes, problemsRes] = await Promise.all([
       supabase.from("subjects").select("*"),
       supabase.from("study_records").select("*"),
+      supabase.from("problem_results").select("*"),
     ]);
+    setProblemResults(problemsRes.error ? [] : ((problemsRes.data as ProblemResult[]) ?? []));
 
     const firstError = subjectsRes.error ?? recordsRes.error;
     if (firstError) {
@@ -166,6 +171,7 @@ export default function ScoresPage() {
               <SelectedUnitPanel
                 unit={selectedUnit}
                 records={selectedRecords}
+                problemResults={problemResults.filter((pr) => selectedRecords.some((r) => r.id === pr.record_id))}
                 color={colorOf(colors, selectedUnit.subjectId)}
                 onChanged={() => load(true)}
               />
@@ -259,11 +265,13 @@ export default function ScoresPage() {
 function SelectedUnitPanel({
   unit,
   records,
+  problemResults,
   color,
   onChanged,
 }: {
   unit: UnitStatus;
   records: StudyRecord[];
+  problemResults: ProblemResult[];
   color: string;
   onChanged: () => Promise<void>;
 }) {
@@ -371,6 +379,9 @@ function SelectedUnitPanel({
 
       </div>
 
+      {/* AI 문제 유형 분석: 이 단원 문항들을 유형별로 */}
+      {problemResults.length > 0 && <TypeBreakdown results={problemResults} color={color} />}
+
       {/* 기록 목록: 수정·삭제 */}
       <div className="border-t border-rule">
         <div className="flex items-baseline justify-between px-4 pb-1 pt-3">
@@ -384,6 +395,51 @@ function SelectedUnitPanel({
         </ol>
       </div>
     </section>
+  );
+}
+
+/** 이 단원 문항을 문제 유형별로: 오답률이 높은 유형부터 (사진 분석으로 저장한 기록만) */
+function TypeBreakdown({ results, color }: { results: ProblemResult[]; color: string }) {
+  const stats = typeStats(results);
+  const recentWrong = [...results]
+    .filter((r) => !r.correct && r.detail)
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, 3);
+  return (
+    <div className="border-t border-rule px-5 py-4">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h3 className="text-[15px] font-bold">문제 유형별</h3>
+        <span className="text-xs text-ink-muted">사진으로 분석한 문항 {results.length}개</span>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {stats.map((s) => (
+          <li key={s.type} className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-3 text-[14px]">
+              <span className="min-w-0 truncate">
+                <strong>{s.type}</strong>
+                {s.topCause && <span className="ml-2 text-[12px] text-ink-muted">주로 {s.topCause}</span>}
+              </span>
+              <span className={`shrink-0 font-bold tabular-nums ${s.wrongRate >= 50 ? "text-danger" : ""}`}>
+                {s.wrong}/{s.total} 틀림 · {s.wrongRate}%
+              </span>
+            </div>
+            <div className="h-2 bg-ground" role="img" aria-label={`${s.type} 오답률 ${s.wrongRate}%`}>
+              <span className="block h-full" style={{ width: `${s.wrongRate}%`, backgroundColor: scoreColor(100 - s.wrongRate) }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {recentWrong.length > 0 && (
+        <div className="mt-4 flex flex-col gap-1.5">
+          <h4 className="text-[13px] font-bold">최근 틀린 문항</h4>
+          {recentWrong.map((r) => (
+            <p key={r.id} className="border-l-[3px] pl-2 text-[13px] leading-relaxed text-ink-soft" style={{ borderColor: color }}>
+              <strong className="text-ink">{r.problem_no}번</strong> {r.problem_type} · {r.cause} — {r.detail}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

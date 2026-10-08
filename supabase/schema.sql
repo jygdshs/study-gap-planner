@@ -7,6 +7,7 @@
 -- ※ 실제 시험 성적 비교(/results)를 쓰려면 이어서 supabase/migrations/003_exam_results.sql 도 실행하세요.
 -- ※ 예전에 만든 프로젝트에서 계획 vs 실제 공부 시간을 쓰려면 supabase/migrations/004_plan_minutes.sql 을 실행하세요.
 --   (이 파일로 새로 만들었다면 plan_items에 이미 들어 있음)
+-- ※ 사진으로 올린 문제를 AI가 유형별로 정리하는 기능은 supabase/migrations/006_problem_analysis.sql 을 실행하세요.
 -- ※ 공부 시간대·특정 날 일정도 예전 프로젝트라면 supabase/migrations/005_time_windows.sql 을 실행하세요.
 
 -- 1) 과목 (과목명, 과목별 시험 날짜)

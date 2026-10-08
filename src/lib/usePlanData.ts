@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
-import type { DaySchedule, PlanItem, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
+import type { DaySchedule, PlanItem, ProblemResult, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
+import { weakestTypeByUnit } from "@/lib/problemAnalysis";
 import {
   addDaysISO,
   buildStudyPlan,
@@ -36,6 +37,8 @@ export function usePlanData() {
   const [availability, setAvailability] = useState<WeeklyAvailability[]>([]);
   // 특정 날 일정 (005 마이그레이션 전이면 빈 목록)
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
+  // AI 문제 유형 분석 결과 (006 마이그레이션 전이면 빈 목록)
+  const [problemResults, setProblemResults] = useState<ProblemResult[]>([]);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +88,10 @@ export function usePlanData() {
           .select("*")
           .gte("date", today)
           .then(({ data, error }) => setDaySchedules(error ? [] : ((data as DaySchedule[]) ?? []))),
+        supabase
+          .from("problem_results")
+          .select("*")
+          .then(({ data, error }) => setProblemResults(error ? [] : ((data as ProblemResult[]) ?? []))),
       ]);
 
       const firstError = subjectsRes.error ?? recordsRes.error ?? availabilityRes.error;
@@ -183,6 +190,10 @@ export function usePlanData() {
     addDaysISO(today, i - ADHERENCE_DAYS)
   ).filter((d) => itemsByDate.has(d));
 
+  // 단원별 가장 약한 문제 유형 (최근 30일, 사진 분석으로 저장한 문항) → 하루 시간표에 "무엇 위주로" 표시
+  const weakTypes = weakestTypeByUnit(problemResults, records, addDaysISO(today, -30));
+  const weakTypeOf = (subjectId: string, unit: string) => weakTypes.get(`${subjectId}::${unit}`) ?? null;
+
   /** 그날이 쉬는 날(공부 가능 0시간이고 저장·추천 칸이 하나도 없음)인지 */
   const isRestDay = (day: PlanDay) =>
     day.availableHours === 0 && day.items.length === 0 && !savedAt(day.date, 0) && !savedAt(day.date, 1);
@@ -267,6 +278,7 @@ export function usePlanData() {
 
   return {
     today,
+    weakTypeOf,
     carried,
     hasTimeColumns,
     plannedMinutesOf,
