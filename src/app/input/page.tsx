@@ -224,7 +224,7 @@ export default function InputPage() {
         description="공부를 마친 단원의 결과를 남기면 학습 점수와 계획이 다시 계산됩니다."
         action={
           <Link href="/analyze" className="btn-light">
-            사진으로 입력 (AI) <ArrowRightIcon className="h-4 w-4" />
+            PDF로 틀린 문제 분석 (AI) <ArrowRightIcon className="h-4 w-4" />
           </Link>
         }
       />

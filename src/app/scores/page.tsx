@@ -398,18 +398,18 @@ function SelectedUnitPanel({
   );
 }
 
-/** 이 단원 문항을 문제 유형별로: 오답률이 높은 유형부터 (사진 분석으로 저장한 기록만) */
+/** 이 단원에서 틀린 문항을 문제 유형별로: 많이 틀린 유형부터 (PDF로 분석해 저장한 기록만) */
 function TypeBreakdown({ results, color }: { results: ProblemResult[]; color: string }) {
   const stats = typeStats(results);
-  const recentWrong = [...results]
-    .filter((r) => !r.correct && r.detail)
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-    .slice(0, 3);
+  const maxWrong = Math.max(1, ...stats.map((s) => s.wrong));
+  // 많이 틀린 유형에 필요한 개념 (중복 없이)
+  const concepts = [...new Set(results.map((r) => r.concept?.trim()).filter((c): c is string => Boolean(c)))].slice(0, 6);
+  const recent = [...results].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 3);
   return (
     <div className="border-t border-rule px-5 py-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h3 className="text-[15px] font-bold">문제 유형별</h3>
-        <span className="text-xs text-ink-muted">사진으로 분석한 문항 {results.length}개</span>
+        <h3 className="text-[15px] font-bold">많이 틀린 문제 유형</h3>
+        <span className="text-xs text-ink-muted">PDF로 분석한 틀린 문항 {results.filter((r) => !r.correct).length}개</span>
       </div>
       <ul className="flex flex-col gap-3">
         {stats.map((s) => (
@@ -419,22 +419,34 @@ function TypeBreakdown({ results, color }: { results: ProblemResult[]; color: st
                 <strong>{s.type}</strong>
                 {s.topCause && <span className="ml-2 text-[12px] text-ink-muted">주로 {s.topCause}</span>}
               </span>
-              <span className={`shrink-0 font-bold tabular-nums ${s.wrongRate >= 50 ? "text-danger" : ""}`}>
-                {s.wrong}/{s.total} 틀림 · {s.wrongRate}%
-              </span>
+              <span className="shrink-0 font-bold tabular-nums">{s.wrong}문항</span>
             </div>
-            <div className="h-2 bg-ground" role="img" aria-label={`${s.type} 오답률 ${s.wrongRate}%`}>
-              <span className="block h-full" style={{ width: `${s.wrongRate}%`, backgroundColor: scoreColor(100 - s.wrongRate) }} />
+            <div className="h-2 bg-ground" role="img" aria-label={`${s.type} ${s.wrong}문항 틀림`}>
+              <span className="block h-full" style={{ width: `${(s.wrong / maxWrong) * 100}%`, backgroundColor: color }} />
             </div>
           </li>
         ))}
       </ul>
-      {recentWrong.length > 0 && (
+      {concepts.length > 0 && (
+        <div className="mt-4 flex flex-col gap-1.5">
+          <h4 className="text-[13px] font-bold">다시 볼 개념</h4>
+          <div className="flex flex-wrap gap-1.5">
+            {concepts.map((c) => (
+              <span key={c} className="border border-rule-strong px-2 py-0.5 text-[13px]">
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {recent.length > 0 && (
         <div className="mt-4 flex flex-col gap-1.5">
           <h4 className="text-[13px] font-bold">최근 틀린 문항</h4>
-          {recentWrong.map((r) => (
+          {recent.map((r) => (
             <p key={r.id} className="border-l-[3px] pl-2 text-[13px] leading-relaxed text-ink-soft" style={{ borderColor: color }}>
-              <strong className="text-ink">{r.problem_no}번</strong> {r.problem_type} · {r.cause} — {r.detail}
+              <strong className="text-ink">{r.problem_no}번</strong> {r.problem_type} · {r.cause}
+              {r.summary ? ` — ${r.summary}` : ""}
+              {r.detail ? ` (메모: ${r.detail})` : ""}
             </p>
           ))}
         </div>
@@ -442,7 +454,6 @@ function TypeBreakdown({ results, color }: { results: ProblemResult[]; color: st
     </div>
   );
 }
-
 /** 틀린 이유 분석: 전체 기록의 틀린 이유를 모아 많이 나온 순서로 */
 function WrongReasonsSheet({
   stats,

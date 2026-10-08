@@ -1,8 +1,9 @@
-// AI 문제 유형 분석: 서버(API 라우트)와 화면이 같이 쓰는 형식과 집계.
+// AI 문제 유형 분석 (Gemini): 서버(API 라우트)와 화면이 같이 쓰는 형식과 집계.
 //
-//  - 과목·단원은 사용자가 정한다. AI는 사진에서 문항마다 맞음/틀림, 문제 유형, 틀린 원인만 정리한다.
-//  - 맞음/틀림은 사진에 있는 채점 표시(O, X, 빗금)나 정답지로만 판단하고, AI가 직접 풀어서 채점하지 않는다.
-//  - 저장은 지금과 같은 학습 기록(문제 풀이 유형) 한 건 + 문항별 결과(problem_results)로 한다.
+//  - 과목·단원·푼 문항 수·틀린 번호는 사용자가 정한다.
+//  - 문제 PDF를 올리면 AI는 '틀린 번호의 문항만' 찾아 문제 유형과 필요한 개념을 정리한다.
+//    문제를 직접 풀지는 않는다. 틀린 원인은 학생이 적은 메모가 있을 때만 분류하고, 없으면 학생이 고른다.
+//  - 저장은 지금과 같은 학습 기록(문제 풀이 유형) 한 건 + 틀린 문항별 결과(problem_results)로 한다.
 //    그래서 학습 점수·우선순위·계획은 지금의 처리 과정을 그대로 거친다.
 
 import type { ProblemResult, StudyRecord } from "@/types/study";
@@ -10,21 +11,20 @@ import type { ProblemResult, StudyRecord } from "@/types/study";
 export const CAUSES = ["계산 실수", "개념 부족", "문제 이해", "시간 부족", "기타"] as const;
 export type Cause = (typeof CAUSES)[number];
 
-export type ProblemOutcome = "correct" | "wrong" | "unknown";
-
-/** AI가 돌려주는 문항 하나 */
+/** AI가 돌려주는 틀린 문항 하나 */
 export interface AnalyzedProblem {
   number: string;
-  result: ProblemOutcome; // unknown = 채점 표시도 정답지도 없어 판단 못 함 → 사용자가 정한다
+  found: boolean; // PDF에서 그 번호의 문항을 찾았는지
+  summary: string; // 무엇을 묻는 문제인지 한 줄 (풀이·정답 아님)
   problem_type: string;
-  cause: Cause | "없음"; // 맞은 문항은 "없음"
-  detail: string;
+  concept: string; // 풀려면 필요한 핵심 개념
+  cause: Cause | "미정"; // 메모가 없으면 "미정" → 학생이 고른다
   confidence: "high" | "medium" | "low";
 }
 
 export interface AnalysisResponse {
   problems: AnalyzedProblem[];
-  note: string; // 사진 전체에 대한 한마디 (흐림, 잘린 문항 등)
+  note: string;
 }
 
 /** API로 보내는 요청 */
@@ -32,38 +32,63 @@ export interface AnalyzeRequest {
   subjectName: string;
   unit: string;
   knownTypes: string[]; // 이 과목에서 전에 쓴 유형 이름 (같은 유형을 같은 이름으로 묶기 위해)
-  images: { media_type: "image/jpeg" | "image/png" | "image/webp"; data: string }[]; // 학생 답안
-  answerKey: { media_type: "image/jpeg" | "image/png" | "image/webp"; data: string }[]; // 정답지 (선택)
+  wrong: { number: string; memo: string }[]; // 틀린 문항 번호와 학생 메모(선택)
+  pdf: string; // base64 (필요한 쪽만 잘라낸 PDF)
 }
 
-export const MAX_IMAGES = 6; // 답안 + 정답지 합계
-export const DAILY_LIMIT = 20; // 하루 분석 횟수
+export const DAILY_LIMIT = 20; // 하루 분석 횟수 (무료 한도를 아끼기 위해)
+export const MAX_PDF_BASE64 = 4_000_000; // 서버 요청 크기 제한(4.5MB) 안쪽
+export const MAX_WRONG = 30;
 
-/** 구조화 출력(JSON) 스키마 — 모든 필드 필수, 추가 필드 없음 */
+/** 구조화 출력(JSON) 스키마 */
 export const ANALYSIS_SCHEMA = {
   type: "object",
-  additionalProperties: false,
   required: ["problems", "note"],
   properties: {
     problems: {
       type: "array",
       items: {
         type: "object",
-        additionalProperties: false,
-        required: ["number", "result", "problem_type", "cause", "detail", "confidence"],
+        required: ["number", "found", "summary", "problem_type", "concept", "cause", "confidence"],
         properties: {
-          number: { type: "string", description: "문항 번호. 사진에 적힌 그대로 (예: 3, 5-2)" },
-          result: { type: "string", enum: ["correct", "wrong", "unknown"] },
+          number: { type: "string", description: "학생이 알려 준 틀린 문항 번호 그대로" },
+          found: { type: "boolean", description: "PDF에서 그 번호의 문항을 찾았으면 true" },
+          summary: { type: "string", description: "무엇을 묻는 문제인지 한 줄. 풀이나 정답은 쓰지 않는다" },
           problem_type: { type: "string", description: "이 문항이 요구하는 능력을 2~10자 한국어 명사구로" },
-          cause: { type: "string", enum: [...CAUSES, "없음"] },
-          detail: { type: "string", description: "틀린 문항: 풀이 어디서 왜 틀렸는지 한 문장. 맞은 문항: 빈 문자열" },
+          concept: { type: "string", description: "이 문제를 풀려면 알아야 하는 핵심 개념 한 가지" },
+          cause: { type: "string", enum: [...CAUSES, "미정"] },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
         },
       },
     },
     note: { type: "string" },
   },
-} as const;
+};
+
+/** "3, 7, 12-14" → ["3","7","12","13","14"] (중복 제거, 입력 순서 유지) */
+export function parseNumbers(input: string): string[] {
+  const out: string[] = [];
+  for (const raw of input.split(/[,\s]+/)) {
+    const part = raw.trim();
+    if (!part) continue;
+    const range = part.match(/^(\d+)\s*[-~]\s*(\d+)$/);
+    if (range) {
+      const a = Number(range[1]);
+      const b = Number(range[2]);
+      if (b >= a && b - a <= 50) for (let n = a; n <= b; n++) out.push(String(n));
+    } else {
+      out.push(part);
+    }
+  }
+  return [...new Set(out)];
+}
+
+/** "1-4, 7" → [1,2,3,4,7] (쪽 번호, 1부터) */
+export function parsePages(input: string, pageCount: number): number[] {
+  return parseNumbers(input)
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= pageCount);
+}
 
 // ---------------------------------------------------------------------------
 // 유형별 집계
@@ -77,7 +102,7 @@ export interface TypeStat {
   topCause: string | null; // 가장 많이 나온 틀린 원인
 }
 
-/** 문항 결과를 유형별로 묶는다. 오답률 높은 순 (같으면 많이 틀린 순) */
+/** 문항 결과를 유형별로 묶는다. 많이 틀린 순 (같으면 오답률 높은 순) */
 export function typeStats(results: Pick<ProblemResult, "problem_type" | "correct" | "cause">[]): TypeStat[] {
   const byType = new Map<string, { total: number; wrong: number; causes: Map<string, number> }>();
   for (const r of results) {
@@ -99,12 +124,12 @@ export function typeStats(results: Pick<ProblemResult, "problem_type" | "correct
       wrongRate: Math.round((s.wrong / s.total) * 1000) / 10,
       topCause: [...s.causes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
     }))
-    .sort((a, b) => b.wrongRate - a.wrongRate || b.wrong - a.wrong);
+    .sort((a, b) => b.wrong - a.wrong || b.wrongRate - a.wrongRate);
 }
 
 /**
- * 단원별 '가장 약한 유형' — 하루 시간표에 "단순 계산 위주"처럼 무엇을 공부할지 붙이는 데 쓴다.
- * 최근 days일 기록의 문항만 보고, 2문항 이상 틀린 유형 중 오답률이 가장 높은 것.
+ * 단원별 '가장 많이 틀린 유형' — 하루 시간표에 "접선의 방정식 위주"처럼 무엇을 공부할지 붙이는 데 쓴다.
+ * 최근 기록(sinceISO 이후)의 문항만 보고, 2문항 이상 틀린 유형 중 가장 많이 틀린 것.
  */
 export function weakestTypeByUnit(
   results: ProblemResult[],
