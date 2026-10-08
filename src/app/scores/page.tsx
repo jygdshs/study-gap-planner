@@ -314,7 +314,16 @@ function SelectedUnitPanel({
         </span>
       </div>
 
-      <div className="grid gap-px bg-rule xl:grid-cols-2">
+      {/* 변화 그래프: 폭을 넉넉하게 쓰도록 패널 맨 위 한 줄 전체 */}
+      <div className="flex flex-col gap-3 border-b border-rule p-5">
+        <h3 className="text-[15px] font-bold">
+          {unit.metricLabel} 변화{" "}
+          <span className="text-[13px] font-normal text-ink-muted">기록 {unit.history.length}회</span>
+        </h3>
+        <ScoreLineChart points={unit.history} color={color} />
+      </div>
+
+      <div className="bg-sheet">
         {/* 점수 근거 */}
         <div className="flex flex-col gap-4 bg-sheet p-5">
           <div className="flex items-baseline justify-between">
@@ -360,14 +369,6 @@ function SelectedUnitPanel({
           )}
         </div>
 
-        {/* 변화 그래프 */}
-        <div className="flex flex-col gap-2 bg-sheet p-5">
-          <h3 className="text-[13px] font-bold">
-            {unit.metricLabel} 변화{" "}
-            <span className="font-normal text-ink-muted">기록 {unit.history.length}회</span>
-          </h3>
-          <ScoreLineChart points={unit.history} color={color} />
-        </div>
       </div>
 
       {/* 기록 목록: 수정·삭제 */}
