@@ -74,6 +74,7 @@ export default function AnalyzePage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [note, setNote] = useState("");
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [usedModel, setUsedModel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -183,6 +184,7 @@ export default function AnalyzePage() {
       );
       setNote(json.note ?? "");
       setRemaining(typeof json.remaining === "number" ? json.remaining : null);
+      setUsedModel(typeof json.model === "string" ? json.model : null);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (e) {
       setError(e instanceof Error ? e.message : "분석하지 못했어요.");
@@ -421,7 +423,7 @@ export default function AnalyzePage() {
             )}
 
             <button type="button" onClick={analyze} disabled={!ready || analyzing} className="btn-primary">
-              {analyzing ? "AI가 틀린 문항을 찾는 중… (10~40초)" : `틀린 ${numbers.length || ""}문항 분석하기`}
+              {analyzing ? "AI가 틀린 문항을 찾는 중… (붐비면 1분 넘게 걸릴 수 있어요)" : `틀린 ${numbers.length || ""}문항 분석하기`}
             </button>
             {!ready && (
               <p className="-mt-3 text-xs text-ink-muted">
@@ -437,7 +439,11 @@ export default function AnalyzePage() {
             <h2 id="result-title" className="sheet-title">
               분석 결과 확인
             </h2>
-            {remaining !== null && <span className="text-xs text-ink-muted">오늘 남은 분석 {remaining}번</span>}
+            {remaining !== null && (
+              <span className="text-xs text-ink-muted">
+                {usedModel && `${usedModel} 분석 · `}오늘 남은 분석 {remaining}번
+              </span>
+            )}
           </div>
 
           {!rows ? (

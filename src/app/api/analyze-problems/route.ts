@@ -17,8 +17,17 @@ import {
   type AnalyzeRequest,
 } from "@/lib/problemAnalysis";
 
-// 무료 등급에서 쓸 수 있는 Flash 모델. 바꾸고 싶으면 GEMINI_MODEL 환경변수로.
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+// 무료 등급에서 쓸 수 있는 Flash 모델들. 앞에서부터 시도하고, 사용자가 몰려 있거나(503) 한도에 걸리면 다음 모델로.
+// 첫 모델은 GEMINI_MODEL 환경변수로 바꿀 수 있다.
+const MODELS = [
+  ...new Set([process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]),
+];
+const RETRY_DELAY_MS = 3000;
+
+/** 잠깐 뒤 다시 하면 될 수 있는 오류: 서버 과부하·일시 오류, 연결 문제(상태 코드 없음) */
+const isTransient = (status?: number) => !status || status >= 500;
+/** 다른 모델로 바꾸면 될 수 있는 오류: 위 + 그 모델의 한도 초과(429)·모델 없음(404) */
+const tryNextModel = (status?: number) => isTransient(status) || status === 429 || status === 404;
 
 const SYSTEM_PROMPT = `너는 고등학생이 푼 문제 PDF에서, 학생이 틀렸다고 알려 준 문항만 찾아 정리하는 도우미다. 결과는 학생의 학습 공백 분석 앱에 저장되어, 어떤 유형의 문제를 왜 틀리는지 찾고 공부 계획을 세우는 데 쓰인다.
 
@@ -132,10 +141,9 @@ export async function POST(req: Request) {
     wrong.map((w) => `- ${w.number}번: ${w.memo || "(메모 없음)"}`).join("\n");
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  let text: string | undefined;
-  try {
+  const callModel = async (model: string) => {
     const interaction = await ai.interactions.create({
-      model: MODEL,
+      model,
       store: false,
       system_instruction: SYSTEM_PROMPT,
       input: [
@@ -144,11 +152,32 @@ export async function POST(req: Request) {
       ],
       response_format: { type: "text", mime_type: "application/json", schema: ANALYSIS_SCHEMA },
     });
-    text = interaction.output_text;
-  } catch (error) {
-    const { status, reason, message } = readGeminiError(error);
-    // Vercel > Logs에서 원인을 볼 수 있게 남긴다 (키는 들어 있지 않음)
-    console.error("[analyze-problems] Gemini error", { status, reason, message, model: MODEL });
+    return interaction.output_text;
+  };
+
+  // 첫 모델은 일시 오류면 한 번 더 기다렸다 시도, 그래도 안 되면 다음 모델로
+  let text: string | undefined;
+  let usedModel: string | null = null;
+  let lastError: ReturnType<typeof readGeminiError> | null = null;
+  attempts: for (const [mi, model] of MODELS.entries()) {
+    for (let attempt = 0; attempt < (mi === 0 ? 2 : 1); attempt++) {
+      try {
+        text = await callModel(model);
+        usedModel = model;
+        break attempts;
+      } catch (error) {
+        lastError = readGeminiError(error);
+        // Vercel > Logs에서 원인을 볼 수 있게 남긴다 (키는 들어 있지 않음)
+        console.error("[analyze-problems] Gemini error", { ...lastError, model, attempt });
+        if (!tryNextModel(lastError.status) || lastError.reason === "API_KEY_INVALID") break attempts;
+        if (!isTransient(lastError.status)) break; // 429·404는 기다리지 않고 바로 다음 모델
+        if (attempt === 0 && mi === 0) await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      }
+    }
+  }
+
+  if (!usedModel && lastError) {
+    const { status, reason, message } = lastError;
     if (reason === "API_KEY_INVALID") {
       return fail("Gemini API 키가 올바르지 않아요. Vercel 환경변수의 GEMINI_API_KEY 값을 다시 확인해 주세요.", 500);
     }
@@ -157,13 +186,14 @@ export async function POST(req: Request) {
       return fail(`이 계정에서 Gemini API를 쓸 수 없어요. 학교 계정이면 관리자가 막아 두었을 수 있어요. (${message})`, 500);
     }
     if (status === 404) {
-      return fail(`모델(${MODEL})을 찾을 수 없어요. GEMINI_MODEL 환경변수로 다른 모델을 지정해 주세요. (${message})`, 500);
+      return fail(`쓸 수 있는 Gemini 모델을 찾지 못했어요. GEMINI_MODEL 환경변수로 모델을 지정해 주세요. (${message})`, 500);
     }
     if (status && status < 500) return fail(`Gemini 요청 오류 (${status}): ${message}`, 400);
-    if (status) return fail(`Gemini 서버 오류 (${status}). 잠시 뒤 다시 해 주세요. (${message})`, 502);
+    if (status) {
+      return fail(`Gemini 모델들이 모두 붐비고 있어요 (${status}). 몇 분 뒤 다시 해 주세요. (${message})`, 503);
+    }
     return fail(`Gemini 서버에 연결하지 못했어요. (${message})`, 502);
   }
-
   let parsed: AnalysisResponse;
   try {
     parsed = JSON.parse(text ?? "") as AnalysisResponse;
@@ -178,5 +208,5 @@ export async function POST(req: Request) {
   // 5) 사용 횟수 +1 (성공한 분석만)
   await supabase.from("ai_usage").upsert({ user_id: userId, day, count: used + 1 }, { onConflict: "user_id,day" });
 
-  return Response.json({ ...parsed, remaining: DAILY_LIMIT - used - 1 });
+  return Response.json({ ...parsed, remaining: DAILY_LIMIT - used - 1, model: usedModel });
 }
