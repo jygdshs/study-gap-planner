@@ -70,6 +70,10 @@ export interface ProblemResult {
   detail: string | null; // 학생 메모
   summary?: string | null; // 무엇을 묻는 문제인지
   concept?: string | null; // 필요한 핵심 개념
+  // 008: 원래 PDF 이름·쪽, 다시 풀기로 저장한 문항이면 원래 오답 id
+  source_name?: string | null;
+  source_page?: number | null;
+  retry_of?: string | null;
   created_at: string;
 }
 

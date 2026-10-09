@@ -3,7 +3,9 @@
 // 학습 계획 화면(/plan)과 처음 화면(/)이 같이 쓰는 데이터 불러오기 + 계획 저장/체크 동작.
 // 계산 자체는 scoring.ts / planTracking.ts가 하고, 여기서는 불러오고 저장하는 일만 한다.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { PLAN_ITEMS_CHANGED } from "@/lib/studyTimer";
+import { showToast } from "@/components/ToastHost";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
 import type { DaySchedule, PlanItem, ProblemResult, StudyRecord, Subject, WeeklyAvailability } from "@/types/study";
 import { weakestTypeByUnit } from "@/lib/problemAnalysis";
@@ -198,7 +200,8 @@ export function usePlanData() {
   const isRestDay = (day: PlanDay) =>
     day.availableHours === 0 && day.items.length === 0 && !savedAt(day.date, 0) && !savedAt(day.date, 1);
 
-  const savePlan = async () => {
+  /** auto: 계획 자동 갱신 — 끝나면 화면 아래 알림으로만 알린다 */
+  const savePlan = async (auto = false) => {
     setSaving(true);
     setMessage(null);
 
@@ -232,11 +235,36 @@ export function usePlanData() {
 
     await loadPlanItems();
     setSaving(false);
+    if (auto) {
+      showToast({ text: "새 학습 결과를 반영해 학습 계획을 자동으로 갱신했어요. 완료한 칸은 그대로예요." });
+      return;
+    }
     setMessage({
       type: "ok",
       text: hasSavedPlan ? "새 학습 점수를 반영해 계획을 갱신했어요." : "학습 계획을 저장했어요.",
     });
   };
+
+  // 계획 자동 갱신: 저장해 둔 계획이 있는데 새 학습 결과로 추천이 바뀌었으면 한 번 자동으로 갱신한다
+  // (처음 저장은 직접 누르게 둔다. 갱신해도 완료한 칸은 그대로)
+  const autoUpdated = useRef(false);
+  useEffect(() => {
+    if (loading || error || planError || saving || autoUpdated.current) return;
+    if (!hasSavedPlan || !planOutdated) return;
+    autoUpdated.current = true;
+    savePlan(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, planError, saving, hasSavedPlan, planOutdated]);
+
+  // 공부 타이머가 기록을 남기면 계획 칸을 다시 불러온다
+  useEffect(() => {
+    const reload = () => {
+      loadPlanItems();
+    };
+    window.addEventListener(PLAN_ITEMS_CHANGED, reload);
+    return () => window.removeEventListener(PLAN_ITEMS_CHANGED, reload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleItem = async (item: PlanItem) => {
     const completed = !item.completed;

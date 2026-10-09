@@ -6,6 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { TimetableMark, UserIcon } from "@/components/Icons";
 import { useAuth } from "@/lib/auth";
 import ThemeToggle from "@/components/ThemeToggle";
+import ToastHost from "@/components/ToastHost";
+import TimerBar from "@/components/TimerBar";
+import { StudyTimerProvider } from "@/lib/studyTimer";
 
 const NAV = [
   { href: "/input", label: "결과 입력" },
@@ -62,6 +65,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
+    <StudyTimerProvider>
     <div className="flex min-h-screen flex-col overflow-x-clip">
       <header className="sticky top-0 z-20 border-b border-white/[0.08] bg-shell text-white">
         <div className="mx-auto flex max-w-7xl flex-col lg:h-14 lg:flex-row lg:items-stretch lg:justify-between lg:px-6">
@@ -128,6 +132,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           학습 공백 분석 및 개인별 학습 계획 추천 시스템 · 2511 정영광 · 정보과학 프로젝트
         </p>
       </footer>
+      {/* 공부 타이머: 돌고 있으면 화면 아래에 붙는다 */}
+      {session && <TimerBar />}
+      <ToastHost />
     </div>
+    </StudyTimerProvider>
   );
 }

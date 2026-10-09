@@ -154,7 +154,7 @@ export default function PlanPage() {
                 {!planError && (
                   <button
                     type="button"
-                    onClick={savePlan}
+                    onClick={() => savePlan()}
                     disabled={saving || upToDate}
                     className={upToDate ? "btn-quiet" : "btn-primary"}
                   >

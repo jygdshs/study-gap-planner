@@ -18,6 +18,8 @@ import {
   type AnalyzeRequest,
   type Cause,
 } from "@/lib/problemAnalysis";
+import { findProblemPages } from "@/lib/pdfTools";
+import { getPdf, listPdfs, removePdf, savePdf, type StoredPdfMeta } from "@/lib/pdfStore";
 import SubjectPicker from "@/components/SubjectPicker";
 import UnitInput from "@/components/UnitInput";
 import { ArrowRightIcon, CloseIcon } from "@/components/Icons";
@@ -68,6 +70,9 @@ export default function AnalyzePage() {
   const [totalInput, setTotalInput] = useState("");
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
   const [pagesInput, setPagesInput] = useState("");
+  const [autoPages, setAutoPages] = useState<Map<string, number> | null>(null); // 번호 → 자동으로 찾은 쪽
+  const [findingPages, setFindingPages] = useState(false);
+  const [recentPdfs, setRecentPdfs] = useState<StoredPdfMeta[]>([]);
   const [numbersInput, setNumbersInput] = useState("");
   const [memos, setMemos] = useState<Record<string, string>>({});
   const [knownTypes, setKnownTypes] = useState<string[]>([]);
@@ -114,22 +119,64 @@ export default function AnalyzePage() {
   const numbers = parseNumbers(numbersInput);
   const total = Number(totalInput);
   const totalValid = Number.isInteger(total) && total > 0 && total >= numbers.length;
-  const pages = pdf ? parsePages(pagesInput, pdf.pageCount) : [];
+  const manualPages = pdf ? parsePages(pagesInput, pdf.pageCount) : [];
+  // 쪽을 직접 적지 않았으면, 틀린 번호가 있는 쪽을 PDF 글자에서 자동으로 찾은 결과를 쓴다
+  const numbersKey = numbers.join(",");
+  const missingNumbers = autoPages ? numbers.filter((n) => !autoPages.has(n)) : [];
+  const usingAuto = manualPages.length === 0 && autoPages !== null && autoPages.size > 0;
+  // 자동으로 다 찾았으면 그 쪽만, 일부 못 찾았으면 전체를 보낸다 (AI가 나머지를 찾도록)
+  const pages = manualPages.length > 0 ? manualPages : usingAuto && missingNumbers.length === 0 ? [...new Set(autoPages!.values())].sort((a, b) => a - b) : [];
   const ready = Boolean(
     subjectId && subjectName && unit.trim() && pdf && numbers.length > 0 && numbers.length <= MAX_WRONG && totalValid
   );
 
-  const loadPdf = async (file: File | undefined) => {
-    if (!file) return;
+  useEffect(() => {
+    setAutoPages(null);
+    if (!pdf || numbers.length === 0) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setFindingPages(true);
+      try {
+        const found = await findProblemPages(pdf.bytes, numbers);
+        if (!cancelled) setAutoPages(found);
+      } catch {
+        if (!cancelled) setAutoPages(new Map()); // 글자가 없는 PDF 등: 못 찾음으로 두고 전체를 보낸다
+      }
+      if (!cancelled) setFindingPages(false);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdf, numbersKey]);
+
+  // 이 브라우저에 기억해 둔 PDF 목록
+  useEffect(() => {
+    listPdfs().then(setRecentPdfs);
+  }, []);
+
+  const openPdf = async (name: string, bytes: Uint8Array) => {
     setError(null);
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
       const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
-      setPdf({ name: file.name, bytes, pageCount: doc.getPageCount() });
+      const pageCount = doc.getPageCount();
+      setPdf({ name, bytes, pageCount });
       setPagesInput("");
+      await savePdf(name, bytes, pageCount); // 같은 PDF 기억
+      setRecentPdfs(await listPdfs());
     } catch {
       setError("PDF를 열지 못했어요. 암호가 걸려 있거나 손상된 파일일 수 있어요.");
     }
+  };
+  const loadPdf = async (file: File | undefined) => {
+    if (!file) return;
+    await openPdf(file.name, new Uint8Array(await file.arrayBuffer()));
+  };
+  const openRecent = async (name: string) => {
+    const bytes = await getPdf(name);
+    if (bytes) await openPdf(name, bytes);
+    else setError("기억해 둔 PDF를 열지 못했어요. 다시 올려 주세요.");
   };
 
   const analyze = async () => {
@@ -239,19 +286,26 @@ export default function AnalyzePage() {
     }
     const recordId = (record as { id: string }).id;
 
-    const { error: prError } = await supabase.from("problem_results").insert(
-      rows.map((r) => ({
-        user_id: user?.id,
-        record_id: recordId,
-        problem_no: r.number,
-        correct: false,
-        problem_type: r.problem_type.trim(),
-        cause: r.cause,
-        detail: r.memo.trim() || null,
-        summary: r.summary.trim() || null,
-        concept: r.concept.trim() || null,
-      }))
-    );
+    const resultRows = rows.map((r) => ({
+      user_id: user?.id,
+      record_id: recordId,
+      problem_no: r.number,
+      correct: false,
+      problem_type: r.problem_type.trim(),
+      cause: r.cause,
+      detail: r.memo.trim() || null,
+      summary: r.summary.trim() || null,
+      concept: r.concept.trim() || null,
+    }));
+    // 008: 어느 PDF 몇 쪽 문항인지도 남긴다 (틀린 문제 다시 풀기에서 그 쪽을 보여주려고)
+    const sourcePage = (n: string) => autoPages?.get(n) ?? (manualPages.length === 1 ? manualPages[0] : null);
+    let { error: prError } = await supabase
+      .from("problem_results")
+      .insert(resultRows.map((r) => ({ ...r, source_name: pdf?.name ?? null, source_page: sourcePage(r.problem_no) })));
+    if (prError && /source_(name|page)/.test(prError.message)) {
+      // 008 마이그레이션 전이면 쪽 정보 없이 저장
+      ({ error: prError } = await supabase.from("problem_results").insert(resultRows));
+    }
     setSaving(false);
     if (prError) {
       // 문항 결과를 못 넣었으면 방금 만든 기록도 지워 반쪽짜리 기록이 남지 않게 한다
@@ -343,9 +397,42 @@ export default function AnalyzePage() {
                   </button>
                 </div>
               ) : (
-                <button type="button" onClick={() => fileRef.current?.click()} className="btn-quiet justify-start">
-                  PDF 고르기
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button type="button" onClick={() => fileRef.current?.click()} className="btn-quiet justify-start">
+                    PDF 고르기
+                  </button>
+                  {/* 같은 PDF 기억: 이 브라우저에 저장해 둔 최근 PDF */}
+                  {recentPdfs.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-ink-muted">최근에 쓴 PDF (이 브라우저에만 저장돼요)</span>
+                      <ul className="flex flex-col border border-rule">
+                        {recentPdfs.map((r) => (
+                          <li key={r.name} className="flex items-center gap-2 border-b border-rule last:border-b-0">
+                            <button
+                              type="button"
+                              onClick={() => openRecent(r.name)}
+                              className="flex min-w-0 flex-1 items-baseline gap-2 px-3 py-2 text-left hover:bg-sheet-alt"
+                            >
+                              <span className="min-w-0 truncate text-[14px] font-semibold">{r.name}</span>
+                              <span className="shrink-0 text-[12px] text-ink-muted">{r.pageCount}쪽</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await removePdf(r.name);
+                                setRecentPdfs(await listPdfs());
+                              }}
+                              aria-label={`${r.name} 목록에서 지우기`}
+                              className="p-2 text-ink-muted hover:text-danger"
+                            >
+                              <CloseIcon className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               )}
               <input
                 ref={fileRef}
@@ -362,15 +449,28 @@ export default function AnalyzePage() {
               {pdf && pdf.pageCount > 1 && (
                 <label className="flex flex-col gap-1.5">
                   <span className="text-[13px] text-ink-soft">
-                    틀린 문항이 있는 쪽 <span className="text-ink-muted">(선택 — 비우면 전체를 보내요)</span>
+                    틀린 문항이 있는 쪽{" "}
+                    <span className="text-ink-muted">(비우면 틀린 번호로 자동으로 찾아요)</span>
                   </span>
                   <input
                     value={pagesInput}
                     onChange={(e) => setPagesInput(e.target.value)}
-                    placeholder={`예: 2-3, 5 (1~${pdf.pageCount}쪽)`}
+                    placeholder={`자동 · 직접 적으려면 예: 2-3, 5 (1~${pdf.pageCount}쪽)`}
                     className="field"
                   />
-                  {pages.length > 0 && <span className="text-xs text-ink-muted">{pages.join(", ")}쪽만 보내요</span>}
+                  <span className="text-xs text-ink-muted">
+                    {manualPages.length > 0
+                      ? `${manualPages.join(", ")}쪽만 보내요`
+                      : numbers.length === 0
+                        ? "틀린 번호를 적으면 그 문항이 있는 쪽을 찾아요."
+                        : findingPages || autoPages === null
+                          ? "틀린 문항이 있는 쪽을 찾는 중…"
+                          : autoPages.size === 0
+                            ? "PDF에서 번호를 찾지 못해 전체를 보내요. (글자가 없는 스캔 PDF일 수 있어요)"
+                            : missingNumbers.length > 0
+                              ? `${[...autoPages.entries()].map(([n, p]) => `${n}번→${p}쪽`).join(", ")} · ${missingNumbers.join(", ")}번은 못 찾아서 전체를 보내요`
+                              : `자동으로 찾았어요: ${[...autoPages.entries()].map(([n, p]) => `${n}번→${p}쪽`).join(", ")} (${pages.join(", ")}쪽만 보내요)`}
+                  </span>
                 </label>
               )}
             </div>
@@ -465,6 +565,9 @@ export default function AnalyzePage() {
                 </Link>
                 <Link href="/plan" className="btn-quiet">
                   계획 보기
+                </Link>
+                <Link href="/retry" className="btn-quiet">
+                  틀린 문제 다시 풀기
                 </Link>
                 <button type="button" onClick={reset} className="btn-quiet">
                   다른 문제 분석

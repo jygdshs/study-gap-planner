@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { scoreOfRecord } from "@/lib/scoring";
 import { gradeConcept } from "@/lib/conceptAi";
+import { showToast } from "@/components/ToastHost";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import UnitInput from "@/components/UnitInput";
 import type { StudyRecord } from "@/types/study";
@@ -109,6 +110,9 @@ export default function RecordRow({
   const remove = async () => {
     setBusy(true);
     setError(null);
+    // 삭제 되돌리기: 지우기 전에 기록과 거기 달린 문항 결과(PDF 분석)를 복사해 둔다
+    const problems = await supabase.from("problem_results").select("*").eq("record_id", record.id);
+    const savedProblems = problems.error ? [] : ((problems.data as Record<string, unknown>[]) ?? []);
     const { error } = await supabase.from("study_records").delete().eq("id", record.id);
     setBusy(false);
     if (error) {
@@ -116,6 +120,22 @@ export default function RecordRow({
       return;
     }
     await onChanged();
+    showToast({
+      text: `${shortDate(record.study_date)} ${record.unit} 기록을 지웠어요.`,
+      actionLabel: "되돌리기",
+      duration: 10000,
+      onAction: async () => {
+        // 같은 id로 다시 넣어 점수·계획이 지우기 전과 똑같아지게 한다
+        const restored = await supabase.from("study_records").insert(record);
+        if (restored.error) {
+          showToast({ text: `되돌리지 못했어요: ${restored.error.message}` });
+          return;
+        }
+        if (savedProblems.length > 0) await supabase.from("problem_results").insert(savedProblems);
+        await onChanged();
+        showToast({ text: "기록을 되돌렸어요." });
+      },
+    });
   };
 
   if (mode === "edit") {

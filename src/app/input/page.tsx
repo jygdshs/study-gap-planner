@@ -7,7 +7,7 @@ import { todayISO } from "@/lib/scoring";
 import { keywordScore } from "@/lib/keywords";
 import KeywordMatches from "@/components/KeywordMatches";
 import ConceptGradeView from "@/components/ConceptGradeView";
-import { fetchDefinition, gradeConcept, type GradeResult } from "@/lib/conceptAi";
+import { fetchDefinition, gradeConcept, suggestConcepts, type GradeResult } from "@/lib/conceptAi";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
 import UnitInput from "@/components/UnitInput";
@@ -55,6 +55,10 @@ export default function InputPage() {
   // 채점: AI 채점 결과. AI가 안 되면 핵심어 일치도로 채점할 수 있다(gradedBy = "keyword")
   const [grade, setGrade] = useState<GradeResult | null>(null);
   const [gradedBy, setGradedBy] = useState<"ai" | "keyword" | null>(null);
+  // 개념 이름 고르기: 이 단원에서 전에 공부한 개념 + AI가 추천한 핵심 개념
+  const [pastConcepts, setPastConcepts] = useState<string[]>([]);
+  const [suggested, setSuggested] = useState<string[] | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
 
   const [wrongReasons, setWrongReasons] = useState<string[]>([]);
 
@@ -69,6 +73,46 @@ export default function InputPage() {
     if (subject) setSubjectId(subject);
     if (presetUnit) setUnit(presetUnit);
   }, []);
+
+  // 이 과목·단원에서 전에 공부한 개념 이름 (많이 본 순) — 다시 공부할 때 고르기만 하면 되게
+  useEffect(() => {
+    setSuggested(null);
+    const u = unit.trim();
+    if (!subjectId || !u || recordType !== "concept") return setPastConcepts([]);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      supabase
+        .from("study_records")
+        .select("concept_name")
+        .eq("subject_id", subjectId)
+        .eq("unit", u)
+        .not("concept_name", "is", null)
+        .then(({ data, error }) => {
+          if (cancelled || error) return;
+          const count = new Map<string, number>();
+          for (const r of (data as { concept_name: string }[] | null) ?? []) {
+            const name = r.concept_name.trim();
+            if (name) count.set(name, (count.get(name) ?? 0) + 1);
+          }
+          setPastConcepts([...count.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n));
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [subjectId, unit, recordType]);
+
+  const loadSuggestions = async () => {
+    setSuggesting(true);
+    setAiError(null);
+    try {
+      setSuggested(await suggestConcepts(subjectName, unit.trim()));
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI가 개념을 추천하지 못했어요.");
+    }
+    setSuggesting(false);
+  };
 
   // AI에게 과목 이름을 알려 주려고 불러 둔다
   useEffect(() => {
@@ -163,8 +207,11 @@ export default function InputPage() {
       return;
     }
 
-    setMessage({ type: "ok", text: "학습 기록이 저장되었습니다!" });
-    setUnit("");
+    // 저장 후 이어서 입력: 과목·단원·날짜는 그대로 두고 결과 칸만 비운다
+    setMessage({ type: "ok", text: `${unit.trim()} 기록을 저장했어요. 같은 단원으로 이어서 입력할 수 있어요.` });
+    if (recordType === "concept" && conceptName.trim()) {
+      setPastConcepts((p) => (p.includes(conceptName.trim()) ? p : [conceptName.trim(), ...p]));
+    }
     setProblemsTotal("");
     setProblemsCorrect("");
     setProblemsWrong("");
@@ -542,6 +589,49 @@ export default function InputPage() {
                       />
                     </label>
 
+                    {/* 개념 이름 고르기: 전에 공부한 개념 + AI 추천 핵심 개념 */}
+                    {(() => {
+                      const chips = [...pastConcepts, ...(suggested ?? []).filter((c) => !pastConcepts.includes(c))];
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {chips.length > 0 && (
+                            <span className="text-xs text-ink-muted">{pastConcepts.length > 0 ? "전에 공부한·추천 개념" : "추천 개념"}</span>
+                          )}
+                          {chips.map((c) => {
+                            const past = pastConcepts.includes(c);
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setConceptName(c)}
+                                title={past ? "전에 공부한 개념" : "AI가 추천한 핵심 개념"}
+                                className={`border px-2 py-0.5 text-[13px] transition-colors hover:border-ink hover:text-ink ${
+                                  conceptName.trim() === c
+                                    ? "border-mark bg-mark text-on-mark"
+                                    : past
+                                      ? "border-rule-strong text-ink-soft"
+                                      : "border-dashed border-rule-strong text-ink-soft"
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            );
+                          })}
+                          {suggested === null && (
+                            <button
+                              type="button"
+                              onClick={loadSuggestions}
+                              disabled={!unit.trim() || suggesting}
+                              title={unit.trim() ? "" : "단원을 먼저 적어 주세요"}
+                              className="text-[13px] font-semibold text-accent hover:underline disabled:text-ink-muted disabled:no-underline"
+                            >
+                              {suggesting ? "추천받는 중…" : `${unit.trim() || "이 단원"} 핵심 개념 추천받기 (AI)`}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {referenceSource === "ai" ? (
                       <>
                         <span className="field-hint">
@@ -694,9 +784,21 @@ export default function InputPage() {
               >
                 <span>{message.text}</span>
                 {message.type === "ok" && (
-                  <Link href="/plan" className="flex items-center gap-1 font-semibold underline">
-                    바뀐 계획 보기 <ArrowRightIcon className="h-3.5 w-3.5" />
-                  </Link>
+                  <span className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnit("");
+                        setMessage(null);
+                      }}
+                      className="font-semibold underline"
+                    >
+                      다른 단원 입력
+                    </button>
+                    <Link href="/plan" className="flex items-center gap-1 font-semibold underline">
+                      바뀐 계획 보기 <ArrowRightIcon className="h-3.5 w-3.5" />
+                    </Link>
+                  </span>
                 )}
               </div>
             )}

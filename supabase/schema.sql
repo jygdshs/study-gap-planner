@@ -9,6 +9,7 @@
 --   (이 파일로 새로 만들었다면 plan_items에 이미 들어 있음)
 -- ※ PDF로 틀린 문제를 AI가 유형별로 정리하는 기능은 supabase/migrations/006_problem_analysis.sql 을 실행하세요.
 -- ※ 개념 의미의 AI 정의·AI 채점 결과를 저장하려면 이어서 supabase/migrations/007_concept_ai_grading.sql 도 실행하세요.
+-- ※ 틀린 문제 다시 풀기와 Supabase 자동 정지 막기는 supabase/migrations/008_retry_keepalive.sql 을 실행하세요.
 -- ※ 공부 시간대·특정 날 일정도 예전 프로젝트라면 supabase/migrations/005_time_windows.sql 을 실행하세요.
 
 -- 1) 과목 (과목명, 과목별 시험 날짜)

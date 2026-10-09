@@ -427,7 +427,12 @@ function TypeBreakdown({ results, color }: { results: ProblemResult[]; color: st
     <div className="border-t border-rule px-5 py-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <h3 className="text-[15px] font-bold">많이 틀린 문제 유형</h3>
-        <span className="text-xs text-ink-muted">PDF로 분석한 틀린 문항 {results.filter((r) => !r.correct).length}개</span>
+        <span className="flex items-baseline gap-3 text-xs text-ink-muted">
+          PDF로 분석한 틀린 문항 {results.filter((r) => !r.correct).length}개
+          <Link href="/retry" className="text-[13px] font-semibold text-accent hover:underline">
+            다시 풀기
+          </Link>
+        </span>
       </div>
       <ul className="flex flex-col gap-3">
         {stats.map((s) => (

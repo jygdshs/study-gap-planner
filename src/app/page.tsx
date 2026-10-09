@@ -282,6 +282,11 @@ export default function HomePage() {
                   body: "정리했던 개념을 가린 채 다시 설명하고 핵심어로 채점해요.",
                 },
                 {
+                  href: "/retry",
+                  title: "틀린 문제 다시 풀기",
+                  body: "PDF로 분석한 틀린 문항을 무작위로 다시 풀고 점수에 반영해요.",
+                },
+                {
                   href: "/results",
                   title: "시험 결과 비교",
                   body: "실제 시험 점수를 넣고 학습 점수가 얼마나 맞았는지 봐요.",

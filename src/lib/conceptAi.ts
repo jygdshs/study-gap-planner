@@ -46,7 +46,16 @@ export const GRADE_SCHEMA = {
   },
 };
 
+export const SUGGEST_SCHEMA = {
+  type: "object",
+  required: ["concepts"],
+  properties: {
+    concepts: { type: "array", items: { type: "string" }, description: "그 단원의 핵심 개념 이름 5~10개" },
+  },
+};
+
 export type ConceptRequest =
+  | { action: "suggest"; subjectName: string; unit: string }
   | { action: "define"; subjectName: string; unit: string; concept: string }
   | { action: "grade"; subjectName: string; unit: string; concept: string; reference: string; answer: string };
 
@@ -63,6 +72,25 @@ async function callConceptApi<T>(body: ConceptRequest): Promise<T & { remaining?
   const json = await res.json().catch(() => ({ error: `AI 요청 실패 (${res.status})` }));
   if (!res.ok) throw new Error(json.error ?? `AI 요청 실패 (${res.status})`);
   return json;
+}
+
+/** 단원의 핵심 개념 이름 목록 (같은 단원은 이 브라우저에 기억해 두고 다시 묻지 않는다) */
+export async function suggestConcepts(subjectName: string, unit: string): Promise<string[]> {
+  const key = `concept-suggest:${subjectName}::${unit}`;
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) return JSON.parse(cached) as string[];
+  } catch {
+    // 저장소를 못 쓰면 매번 묻는다
+  }
+  const r = await callConceptApi<{ concepts: string[] }>({ action: "suggest", subjectName, unit });
+  const concepts = (r.concepts ?? []).map((c) => c.trim()).filter(Boolean);
+  try {
+    localStorage.setItem(key, JSON.stringify(concepts));
+  } catch {
+    // 무시
+  }
+  return concepts;
 }
 
 export function fetchDefinition(subjectName: string, unit: string, concept: string) {

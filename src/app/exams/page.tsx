@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import UnitManager from "@/components/UnitManager";
 import { supabase, describeLoadError } from "@/lib/supabaseClient";
 import {
   addDaysISO,
@@ -426,6 +427,10 @@ export default function ExamsPage() {
               </p>
             </div>
           </section>
+
+          <div className="lg:col-span-2">
+            <UnitManager subjects={subjects} />
+          </div>
         </div>
       )}
     </PageFrame>

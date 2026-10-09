@@ -8,6 +8,7 @@ import { dayCells, daySchedule } from "@/lib/dayCells";
 import type { PlanDay } from "@/lib/scoring";
 import type { PlanData } from "@/lib/usePlanData";
 import { CheckIcon } from "@/components/Icons";
+import { useStudyTimer } from "@/lib/studyTimer";
 
 // 하루 시간표: 공부 시간대 안에서 공부 블록과 쉬는 시간을 시각과 함께 보여준다.
 // 저장된 칸은 오늘까지 눌러서 완료 체크할 수 있다 (같은 과목을 나눈 조각은 한꺼번에 체크).
@@ -24,6 +25,7 @@ export default function DayTimeline({
   showSummary?: boolean;
 }) {
   const { isRestDay, toggleItem, today, weakTypeOf } = data;
+  const studyTimer = useStudyTimer();
 
   if (isRestDay(day)) {
     return <p className="text-[14px] text-ink-muted">쉬는 날이에요{day.special?.note ? ` (${day.special.note})` : ""}.</p>;
@@ -128,7 +130,8 @@ export default function DayTimeline({
             backgroundColor: `color-mix(in srgb, ${cell.color} ${cell.completed ? 5 : 10}%, transparent)`,
           };
           return (
-            <li key={b.start} className={cell.completed ? "opacity-70" : ""}>
+            <li key={b.start} className={`flex items-stretch gap-1.5 ${cell.completed ? "opacity-70" : ""}`}>
+              <div className="min-w-0 flex-1">
               {checkable ? (
                 <button
                   type="button"
@@ -144,6 +147,29 @@ export default function DayTimeline({
                 <div className={row} style={style}>
                   {content}
                 </div>
+              )}
+              </div>
+              {/* 공부 타이머: 오늘의 저장된 칸, 그 과목의 첫 조각에만 */}
+              {cell.saved && day.date === today && !cell.completed && (b.part ?? 1) === 1 && (
+                studyTimer.timer?.planItemId === cell.saved.id ? (
+                  <span className="flex shrink-0 items-center px-2 text-[12px] font-bold text-accent">공부 중</span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={Boolean(studyTimer.timer)}
+                    title={studyTimer.timer ? "다른 타이머가 돌고 있어요" : "타이머를 켜고 공부 시작"}
+                    onClick={() =>
+                      studyTimer.start({
+                        planItemId: cell.saved!.id,
+                        label: `${cell.name} ${cell.unit}`,
+                        plannedMinutes: cell.minutes,
+                      })
+                    }
+                    className="shrink-0 border border-rule-strong px-2.5 text-[12px] font-bold text-ink hover:border-ink disabled:text-ink-muted disabled:hover:border-rule-strong"
+                  >
+                    ▶ 시작
+                  </button>
+                )
               )}
             </li>
           );
