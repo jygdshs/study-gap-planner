@@ -18,6 +18,8 @@ import type { RecordType } from "@/types/study";
 // toISOString()은 UTC 기준이라 한국 시간 오전 9시 전에는 '어제' 날짜가 나온다.
 // 그래서 로컬 날짜를 쓰는 scoring.ts의 todayISO를 사용한다.
 
+type CountKey = "total" | "correct" | "wrong";
+
 const TYPE_OPTIONS: { value: RecordType; label: string; hint: string }[] = [
   { value: "problem", label: "문제 풀이", hint: "정답률로 채점" },
   { value: "concept", label: "개념 의미", hint: "AI가 뜻이 맞는지 채점" },
@@ -33,6 +35,10 @@ export default function InputPage() {
   const [problemsTotal, setProblemsTotal] = useState("");
   const [problemsCorrect, setProblemsCorrect] = useState("");
   const [problemsWrong, setProblemsWrong] = useState("");
+  // 세 칸 중 두 칸을 적으면 나머지 한 칸은 자동으로 (문제 풀이 수 = 맞은 수 + 틀린 수)
+  //  recentCounts: 사용자가 마지막으로 직접 적은 두 칸, autoCount: 자동으로 채운 칸
+  const [recentCounts, setRecentCounts] = useState<CountKey[]>([]);
+  const [autoCount, setAutoCount] = useState<CountKey | null>(null);
 
   // 개념 의미 유형
   const [conceptReference, setConceptReference] = useState("");
@@ -162,6 +168,8 @@ export default function InputPage() {
     setProblemsTotal("");
     setProblemsCorrect("");
     setProblemsWrong("");
+    setRecentCounts([]);
+    setAutoCount(null);
     setConceptReference("");
     setConceptAnswer("");
     setConceptName("");
@@ -315,11 +323,55 @@ export default function InputPage() {
     </div>
   );
 
-  const countFields = [
-    { label: "문제 풀이 수", value: problemsTotal, set: setProblemsTotal },
-    { label: "맞은 문제 수", value: problemsCorrect, set: setProblemsCorrect },
-    { label: "틀린 문제 수", value: problemsWrong, set: setProblemsWrong },
+  const countValues: Record<CountKey, string> = { total: problemsTotal, correct: problemsCorrect, wrong: problemsWrong };
+  const countSetters: Record<CountKey, (v: string) => void> = {
+    total: setProblemsTotal,
+    correct: setProblemsCorrect,
+    wrong: setProblemsWrong,
+  };
+  const countFields: { key: CountKey; label: string }[] = [
+    { key: "total", label: "문제 풀이 수" },
+    { key: "correct", label: "맞은 문제 수" },
+    { key: "wrong", label: "틀린 문제 수" },
   ];
+
+  /** 한 칸을 고치면, 마지막으로 직접 적은 두 칸으로 나머지 한 칸을 계산해 채운다 */
+  const changeCount = (key: CountKey, value: string) => {
+    const next = { ...countValues, [key]: value };
+    countSetters[key](value);
+    setMessage(null);
+
+    // 지운 칸은 '직접 적은 칸'에서 빼고, 그 칸으로 계산했던 자동 칸도 비운다
+    if (value === "") {
+      setRecentCounts((r) => r.filter((k) => k !== key));
+      if (autoCount && autoCount !== key) {
+        countSetters[autoCount]("");
+        setAutoCount(null);
+      }
+      if (autoCount === key) setAutoCount(null);
+      return;
+    }
+
+    const recent = [key, ...recentCounts.filter((k) => k !== key)].slice(0, 2);
+    setRecentCounts(recent);
+    if (recent.length < 2) {
+      if (autoCount === key) setAutoCount(null);
+      return;
+    }
+    // 가장 오래전에 적은(또는 아직 안 적은) 칸을 나머지 두 칸으로 다시 계산한다
+    const target = (["total", "correct", "wrong"] as const).find((k) => !recent.includes(k))!;
+
+    const n = (k: CountKey) => Number(next[k]);
+    const computed = target === "total" ? n("correct") + n("wrong") : target === "correct" ? n("total") - n("wrong") : n("total") - n("correct");
+    if (!Number.isFinite(computed) || computed < 0) {
+      // 맞은 수가 풀이 수보다 큰 경우 등: 자동 칸을 비워 두고 저장할 때 안내한다
+      countSetters[target]("");
+      setAutoCount(target);
+      return;
+    }
+    countSetters[target](String(computed));
+    setAutoCount(target);
+  };
 
   return (
     <PageFrame>
@@ -406,21 +458,34 @@ export default function InputPage() {
           </div>
           <div className="flex flex-col gap-6 p-5">
             {recordType === "problem" ? (
+              <>
               <div className="grid grid-cols-3 gap-3">
-                {countFields.map((f) => (
-                  <label key={f.label} className="flex flex-col gap-2">
-                    <span className="field-label">{f.label}</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      value={f.value}
-                      onChange={(e) => f.set(e.target.value)}
-                      className="field text-[20px] font-bold"
-                    />
-                  </label>
-                ))}
+                {countFields.map((f) => {
+                  const auto = autoCount === f.key && countValues[f.key] !== "";
+                  return (
+                    <label key={f.key} className="flex flex-col gap-2">
+                      <span className="field-label flex items-center gap-1.5">
+                        {f.label}
+                        {auto && (
+                          <span className="border border-accent px-1 text-[10px] font-bold leading-tight text-accent">
+                            자동
+                          </span>
+                        )}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={countValues[f.key]}
+                        onChange={(e) => changeCount(f.key, e.target.value)}
+                        className={`field text-[20px] font-bold ${auto ? "border-dashed text-ink-soft" : ""}`}
+                      />
+                    </label>
+                  );
+                })}
               </div>
+              <p className="-mt-3 text-xs text-ink-muted">두 칸을 적으면 나머지 한 칸은 자동으로 채워져요.</p>
+              </>
             ) : (
               <>
                 {/* ① 기준 의미: 직접 쓰거나 AI가 가져온다. 확정하면 가려지고 채점한 뒤에 다시 보인다 */}
