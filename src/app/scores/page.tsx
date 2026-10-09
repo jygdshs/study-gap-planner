@@ -304,8 +304,10 @@ function SelectedUnitPanel({
 
   // 개념 의미 단원이면 가장 최근 기록의 핵심어 채점 근거도 보여준다
   const latest = unit.latestRecord;
+  // (AI가 채점한 기록이면 핵심어 대신 AI 채점 근거를 보여준다)
+  const aiGraded = latest.record_type === "concept" && latest.concept_score != null;
   const conceptMatches =
-    latest.record_type === "concept"
+    latest.record_type === "concept" && !aiGraded
       ? keywordScore(latest.concept_reference ?? "", latest.concept_answer ?? "").matches
       : [];
 
@@ -364,6 +366,22 @@ function SelectedUnitPanel({
               <dd className="text-right text-[15px] font-extrabold">{unit.finalScore}</dd>
             </div>
           </dl>
+          {aiGraded && (
+            <div className="flex flex-col gap-2 border-t border-rule pt-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="text-[13px] font-bold">
+                  최근 기록의 AI 채점
+                  {latest.concept_name && <span className="ml-1 font-normal text-ink-muted">· {latest.concept_name}</span>}
+                </h3>
+                <Link href="/quiz" className="text-[13px] font-semibold text-accent hover:underline">
+                  복습 퀴즈로 다시 풀기
+                </Link>
+              </div>
+              <p className="text-[14px] leading-relaxed text-ink-soft">
+                {latest.concept_feedback || "AI가 기준 의미와 뜻이 얼마나 같은지 채점했어요."}
+              </p>
+            </div>
+          )}
           {conceptMatches.length > 0 && (
             <div className="flex flex-col gap-2 border-t border-rule pt-3">
               <div className="flex items-baseline justify-between gap-2">

@@ -88,7 +88,7 @@ export function textSimilarity(a: string, b: string): number {
 
 export interface RecordScore {
   record: StudyRecord;
-  metricLabel: string; // "정답률" | "핵심어 일치도"
+  metricLabel: string; // "정답률" | "AI 채점" | "핵심어 일치도"
   metricValue: number; // 0~100
 }
 
@@ -100,7 +100,11 @@ export function scoreOfRecord(record: StudyRecord): RecordScore {
     return { record, metricLabel: "정답률", metricValue: Math.round(value * 10) / 10 };
   }
 
-  // 9차시: 개념 의미는 '핵심 단어 일치도'로 채점한다 (src/lib/keywords.ts)
+  // AI가 채점한 기록이면 그 점수 (기준 의미와 뜻이 같은지 AI가 0~100으로 매김)
+  if (record.concept_score != null) {
+    return { record, metricLabel: "AI 채점", metricValue: Math.round(Number(record.concept_score) * 10) / 10 };
+  }
+  // 9차시: 개념 의미는 '핵심 단어 일치도'로 채점한다 (src/lib/keywords.ts) — AI 채점 전 기록과 AI가 안 될 때
   const { score } = keywordScore(record.concept_reference ?? "", record.concept_answer ?? "");
   return { record, metricLabel: "핵심어 일치도", metricValue: score };
 }

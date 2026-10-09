@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { todayISO } from "@/lib/scoring";
 import { keywordScore } from "@/lib/keywords";
 import KeywordMatches from "@/components/KeywordMatches";
+import ConceptGradeView from "@/components/ConceptGradeView";
+import { fetchDefinition, gradeConcept, type GradeResult } from "@/lib/conceptAi";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import SubjectPicker from "@/components/SubjectPicker";
 import UnitInput from "@/components/UnitInput";
@@ -18,7 +20,7 @@ import type { RecordType } from "@/types/study";
 
 const TYPE_OPTIONS: { value: RecordType; label: string; hint: string }[] = [
   { value: "problem", label: "문제 풀이", hint: "정답률로 채점" },
-  { value: "concept", label: "개념 의미", hint: "기준 의미의 핵심어로 채점" },
+  { value: "concept", label: "개념 의미", hint: "AI가 뜻이 맞는지 채점" },
 ];
 
 export default function InputPage() {
@@ -35,8 +37,18 @@ export default function InputPage() {
   // 개념 의미 유형
   const [conceptReference, setConceptReference] = useState("");
   const [conceptAnswer, setConceptAnswer] = useState("");
-  // 컨닝 방지: ① 기준 의미 쓰기 → (가림) ② 내 설명 쓰기 → ③ 채점 후에야 기준 의미·점수·틀린 이유 공개
+  // 컨닝 방지: ① 기준 의미 쓰기(또는 AI가 가져옴) → (가림) ② 내 설명 쓰기 → ③ 채점 후에야 기준 의미·점수·틀린 이유 공개
   const [conceptStep, setConceptStep] = useState<"reference" | "answer" | "graded">("reference");
+  // 기준 의미: 직접 입력 / AI가 개념 이름으로 정의를 가져옴 (AI 정의는 내 설명을 쓰기 전까지 한 번도 보여주지 않는다)
+  const [referenceSource, setReferenceSource] = useState<"user" | "ai">("ai");
+  const [conceptName, setConceptName] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [aiBusy, setAiBusy] = useState<"define" | "grade" | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [defineNote, setDefineNote] = useState<string | null>(null);
+  // 채점: AI 채점 결과. AI가 안 되면 핵심어 일치도로 채점할 수 있다(gradedBy = "keyword")
+  const [grade, setGrade] = useState<GradeResult | null>(null);
+  const [gradedBy, setGradedBy] = useState<"ai" | "keyword" | null>(null);
 
   const [wrongReasons, setWrongReasons] = useState<string[]>([]);
 
@@ -51,6 +63,17 @@ export default function InputPage() {
     if (subject) setSubjectId(subject);
     if (presetUnit) setUnit(presetUnit);
   }, []);
+
+  // AI에게 과목 이름을 알려 주려고 불러 둔다
+  useEffect(() => {
+    if (!subjectId) return setSubjectName("");
+    supabase
+      .from("subjects")
+      .select("name")
+      .eq("id", subjectId)
+      .maybeSingle()
+      .then(({ data }) => setSubjectName((data as { name: string } | null)?.name ?? ""));
+  }, [subjectId]);
 
   const resetTypeFields = (type: RecordType) => {
     setRecordType(type);
@@ -75,7 +98,7 @@ export default function InputPage() {
       if (!conceptReference.trim() || !conceptAnswer.trim()) {
         return "기준 의미와 채점할 의미를 모두 입력해 주세요.";
       }
-      if (conceptStep !== "graded") {
+      if (conceptStep !== "graded" || !gradedBy) {
         return "내 설명을 쓰고 ‘채점하기’를 먼저 눌러 주세요.";
       }
     }
@@ -108,6 +131,15 @@ export default function InputPage() {
       problems_wrong: recordType === "problem" ? Number(problemsWrong) : null,
       concept_reference: recordType === "concept" ? conceptReference.trim() : null,
       concept_answer: recordType === "concept" ? conceptAnswer.trim() : null,
+      // 007: AI 채점이면 점수·근거를 저장 (핵심어 채점이면 비워 두고 저장할 때마다 다시 계산)
+      ...(recordType === "concept"
+        ? {
+            concept_name: conceptName.trim() || null,
+            reference_source: referenceSource,
+            concept_score: gradedBy === "ai" && grade ? grade.score : null,
+            concept_feedback: gradedBy === "ai" && grade ? grade.feedback : null,
+          }
+        : {}),
     };
 
     const { error } = await supabase.from("study_records").insert(payload);
@@ -115,7 +147,13 @@ export default function InputPage() {
     setSubmitting(false);
 
     if (error) {
-      setMessage({ type: "error", text: `저장 실패: ${error.message}` });
+      const missingColumn = /concept_(name|score|feedback)|reference_source/.test(error.message);
+      setMessage({
+        type: "error",
+        text: missingColumn
+          ? "AI 채점 결과를 저장할 칸이 없어요. Supabase SQL Editor에서 supabase/migrations/007_concept_ai_grading.sql을 실행해 주세요."
+          : `저장 실패: ${error.message}`,
+      });
       return;
     }
 
@@ -126,29 +164,88 @@ export default function InputPage() {
     setProblemsWrong("");
     setConceptReference("");
     setConceptAnswer("");
+    setConceptName("");
     setConceptStep("reference");
+    setGrade(null);
+    setGradedBy(null);
+    setDefineNote(null);
+    setAiError(null);
     setWrongReasons([]);
   };
 
   // 개념 의미 단계 이동
+  const clearGrade = () => {
+    setGrade(null);
+    setGradedBy(null);
+    setAiError(null);
+  };
   const confirmReference = () => {
     setConceptAnswer("");
+    clearGrade();
     setConceptStep("answer");
     setMessage(null);
+  };
+  // AI가 개념 이름으로 정의를 가져온다. 정의는 화면에 띄우지 않고 바로 '내 설명 쓰기'로 넘어간다
+  const fetchReference = async () => {
+    if (!conceptName.trim()) return;
+    setAiBusy("define");
+    setAiError(null);
+    setDefineNote(null);
+    try {
+      const r = await fetchDefinition(subjectName, unit.trim(), conceptName.trim());
+      if (!r.found || !r.definition.trim()) {
+        setDefineNote(r.note || "이 이름으로는 정의를 찾지 못했어요. 이름을 조금 더 정확하게 적어 보세요.");
+      } else {
+        setConceptReference(r.definition.trim());
+        confirmReference();
+        setDefineNote(r.note || null); // 뜻이 여러 개일 때 안내 (정의 내용은 들어 있지 않음)
+      }
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI가 정의를 가져오지 못했어요.");
+    }
+    setAiBusy(null);
   };
   // 기준 의미를 다시 보면 내 설명은 지운다 (보고 쓰지 못하게)
   const editReference = () => {
     setConceptAnswer("");
+    clearGrade();
     setConceptStep("reference");
     setMessage(null);
   };
-  const gradeAnswer = () => {
-    setConceptStep("graded");
+  // AI가 가져온 정의는 보여주지 않은 채로 버리고 개념 이름부터 다시
+  const changeConcept = () => {
+    setConceptReference("");
+    setConceptAnswer("");
+    clearGrade();
+    setDefineNote(null);
+    setConceptStep("reference");
     setMessage(null);
+  };
+  const gradeAnswer = async () => {
+    setAiBusy("grade");
+    setAiError(null);
+    setMessage(null);
+    try {
+      const g = await gradeConcept(subjectName, unit.trim(), conceptName.trim(), conceptReference, conceptAnswer);
+      setGrade(g);
+      setGradedBy("ai");
+      setConceptStep("graded");
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI가 채점하지 못했어요.");
+    }
+    setAiBusy(null);
+  };
+  // AI가 안 될 때: 예전 방식(기준 의미의 핵심어가 내 설명에 얼마나 있는지)으로 채점
+  const gradeByKeywords = () => {
+    setGrade(null);
+    setGradedBy("keyword");
+    setAiError(null);
+    setConceptStep("graded");
   };
   // 채점 뒤 다시 쓰기: 내 설명을 지우고 기준 의미를 다시 가린다
   const rewriteAnswer = () => {
     setConceptAnswer("");
+    clearGrade();
     setConceptStep("answer");
     setMessage(null);
   };
@@ -159,7 +256,7 @@ export default function InputPage() {
   // 9차시: 개념 의미는 핵심어 일치도로 채점 — 맞춘/빠진 핵심어도 함께 보여준다
   //         단, 채점하기를 누르기 전에는 점수도 계산해서 보여주지 않는다 (힌트가 되지 않게)
   const conceptPreview =
-    recordType === "concept" && conceptStep === "graded" && conceptReference.trim() && conceptAnswer.trim()
+    recordType === "concept" && conceptStep === "graded" && gradedBy === "keyword" && conceptReference.trim() && conceptAnswer.trim()
       ? keywordScore(conceptReference, conceptAnswer)
       : null;
   // 개념 의미는 채점 전까지 점수·틀린 이유 칸을 숨긴다
@@ -169,9 +266,11 @@ export default function InputPage() {
       ? problemsTotal !== "" && problemsCorrect !== "" && total > 0 && correct <= total
         ? { label: "정답률", value: Math.round((correct / total) * 1000) / 10 }
         : null
-      : conceptPreview
-        ? { label: "핵심어 일치도", value: conceptPreview.score }
-        : null;
+      : gradedBy === "ai" && grade
+        ? { label: "AI 채점", value: grade.score }
+        : conceptPreview
+          ? { label: "핵심어 일치도", value: conceptPreview.score }
+          : null;
 
   const scoreBlock = (
     <div
@@ -195,6 +294,11 @@ export default function InputPage() {
         </span>
       </div>
       <ScoreBar score={preview?.value ?? 0} />
+      {gradedBy === "ai" && grade && (
+        <div className="pt-2">
+          <ConceptGradeView grade={grade} />
+        </div>
+      )}
       {conceptPreview && <KeywordMatches matches={conceptPreview.matches} />}
     </div>
   );
@@ -204,7 +308,7 @@ export default function InputPage() {
       <span className="field-label">
         틀린 이유{" "}
         <span className="font-normal text-ink-muted">
-          {recordType === "concept" ? "빠진 핵심어를 보고 왜 놓쳤는지 3~4개" : "대표적인 이유 3~4개"}
+          {recordType === "concept" ? "빠진 점·잘못 안 점을 보고 왜 그랬는지 3~4개" : "대표적인 이유 3~4개"}
         </span>
       </span>
       <WrongReasonsInput value={wrongReasons} onChange={setWrongReasons} />
@@ -319,34 +423,110 @@ export default function InputPage() {
               </div>
             ) : (
               <>
-                {/* ① 기준 의미: 확정하면 가려지고, 채점한 뒤에 다시 보인다 */}
+                {/* ① 기준 의미: 직접 쓰거나 AI가 가져온다. 확정하면 가려지고 채점한 뒤에 다시 보인다 */}
                 {conceptStep === "reference" ? (
                   <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-2">
-                      <span className="field-label">① 기준 의미</span>
-                      <span className="field-hint">
-                        교과서나 인터넷에 있는 정확한 의미. 확정하면 가려지고 채점한 뒤에 다시 보여요.
+                    <span className="field-label">① 기준 의미</span>
+                    <div role="radiogroup" aria-label="기준 의미 가져오기" className="grid grid-cols-2 border border-rule-strong">
+                      {(
+                        [
+                          { value: "ai", label: "AI가 정의 가져오기", hint: "개념 이름만 적으면 돼요" },
+                          { value: "user", label: "직접 입력", hint: "교과서·노트의 정의" },
+                        ] as const
+                      ).map((opt, i) => {
+                        const active = referenceSource === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => {
+                              setReferenceSource(opt.value);
+                              setAiError(null);
+                              setDefineNote(null);
+                            }}
+                            className={`flex flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors ${
+                              i === 1 ? "border-l border-rule-strong" : ""
+                            } ${active ? "bg-mark text-on-mark" : "bg-sheet text-ink hover:bg-ground"}`}
+                          >
+                            <span className="text-[13px] font-bold">{opt.label}</span>
+                            <span className={`text-[11px] ${active ? "text-on-mark/75" : "text-ink-muted"}`}>{opt.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-[13px] font-semibold">
+                        개념 이름{" "}
+                        <span className="font-normal text-ink-muted">{referenceSource === "ai" ? "" : "(선택)"}</span>
                       </span>
-                      <textarea
-                        value={conceptReference}
-                        onChange={(e) => setConceptReference(e.target.value)}
-                        rows={3}
-                        placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
-                        className="field resize-y leading-relaxed"
+                      <input
+                        value={conceptName}
+                        onChange={(e) => setConceptName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && referenceSource === "ai") {
+                            e.preventDefault();
+                            fetchReference();
+                          }
+                        }}
+                        maxLength={60}
+                        placeholder="예: 미분계수, 1계 선형 미분방정식"
+                        className="field"
                       />
                     </label>
-                    <button
-                      type="button"
-                      onClick={confirmReference}
-                      disabled={!conceptReference.trim()}
-                      className="btn-primary self-start"
-                    >
-                      기준 의미 확정하고 내 설명 쓰기 <ArrowRightIcon className="h-4 w-4" />
-                    </button>
+
+                    {referenceSource === "ai" ? (
+                      <>
+                        <span className="field-hint">
+                          AI가 가져온 정의는 내 설명을 다 쓰고 채점할 때까지 보여주지 않아요.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={fetchReference}
+                          disabled={!conceptName.trim() || aiBusy !== null}
+                          className="btn-primary self-start"
+                        >
+                          {aiBusy === "define" ? "정의를 가져오는 중…" : "AI 정의 가져오고 내 설명 쓰기"}
+                          {aiBusy !== "define" && <ArrowRightIcon className="h-4 w-4" />}
+                        </button>
+                        {defineNote && <p className="notice-warn">{defineNote}</p>}
+                      </>
+                    ) : (
+                      <>
+                        <label className="flex flex-col gap-2">
+                          <span className="field-hint">
+                            교과서나 노트에 있는 정확한 의미. 확정하면 가려지고 채점한 뒤에 다시 보여요.
+                          </span>
+                          <textarea
+                            value={conceptReference}
+                            onChange={(e) => setConceptReference(e.target.value)}
+                            rows={3}
+                            placeholder="예: 미분이란 순간 변화율을 구하는 것이다."
+                            className="field resize-y leading-relaxed"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={confirmReference}
+                          disabled={!conceptReference.trim()}
+                          className="btn-primary self-start"
+                        >
+                          기준 의미 확정하고 내 설명 쓰기 <ArrowRightIcon className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <span className="field-label">① 기준 의미</span>
+                    <span className="field-label">
+                      ① 기준 의미{" "}
+                      <span className="font-normal text-ink-muted">
+                        {referenceSource === "ai" ? "AI가 가져온 정의" : "직접 입력"}
+                        {conceptName.trim() && ` · ${conceptName.trim()}`}
+                      </span>
+                    </span>
                     {conceptStep === "graded" ? (
                       <p className="border border-rule bg-sheet-alt px-3 py-2.5 text-[15px] leading-relaxed">
                         {conceptReference}
@@ -354,16 +534,28 @@ export default function InputPage() {
                     ) : (
                       <div className="flex flex-wrap items-center justify-between gap-2 border border-dashed border-rule-strong px-3 py-3 text-[13px] text-ink-muted">
                         <span>가려 두었어요 · 채점하면 보여요 ({conceptReference.trim().length}자)</span>
-                        <button
-                          type="button"
-                          onClick={editReference}
-                          title="기준 의미를 다시 보면 지금 쓴 내 설명은 지워져요"
-                          className="font-semibold text-accent hover:underline"
-                        >
-                          기준 의미 고치기
-                        </button>
+                        {referenceSource === "ai" ? (
+                          <button
+                            type="button"
+                            onClick={changeConcept}
+                            title="가져온 정의는 보여주지 않고 버려요"
+                            className="font-semibold text-accent hover:underline"
+                          >
+                            다른 개념으로 바꾸기
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={editReference}
+                            title="기준 의미를 다시 보면 지금 쓴 내 설명은 지워져요"
+                            className="font-semibold text-accent hover:underline"
+                          >
+                            기준 의미 고치기
+                          </button>
+                        )}
                       </div>
                     )}
+                    {defineNote && conceptStep !== "graded" && <p className="text-[12px] text-ink-muted">{defineNote}</p>}
                   </div>
                 )}
 
@@ -375,12 +567,12 @@ export default function InputPage() {
                       <span className="field-hint">
                         {conceptStep === "graded"
                           ? "채점이 끝나 고칠 수 없어요. 다시 쓰려면 아래 ‘다시 쓰기’를 누르세요."
-                          : "기준 의미를 보지 않고 내가 이해한 대로 직접 써 보세요."}
+                          : "기준 의미를 보지 않고 내가 이해한 대로 직접 써 보세요. AI가 뜻이 맞는지 채점해요."}
                       </span>
                       <textarea
                         value={conceptAnswer}
                         onChange={(e) => setConceptAnswer(e.target.value)}
-                        readOnly={conceptStep === "graded"}
+                        readOnly={conceptStep === "graded" || aiBusy === "grade"}
                         rows={3}
                         placeholder="내가 이해한 개념의 의미를 적어 보세요."
                         autoFocus={conceptStep === "answer"}
@@ -388,14 +580,24 @@ export default function InputPage() {
                       />
                     </label>
                     {conceptStep === "answer" ? (
-                      <button
-                        type="button"
-                        onClick={gradeAnswer}
-                        disabled={!conceptAnswer.trim()}
-                        className="btn-primary self-start"
-                      >
-                        채점하기
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={gradeAnswer}
+                          disabled={!conceptAnswer.trim() || aiBusy !== null}
+                          className="btn-primary self-start"
+                        >
+                          {aiBusy === "grade" ? "AI가 채점하는 중…" : "AI로 채점하기"}
+                        </button>
+                        {aiError && (
+                          <div className="notice-error flex flex-col items-start gap-2">
+                            <span>{aiError}</span>
+                            <button type="button" onClick={gradeByKeywords} className="font-semibold underline">
+                              AI 없이 핵심어로 채점하기
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <button type="button" onClick={rewriteAnswer} className="btn-quiet self-start">
                         다시 쓰기 <span className="font-normal text-ink-muted">기준 의미가 다시 가려져요</span>
@@ -403,12 +605,13 @@ export default function InputPage() {
                     )}
                   </div>
                 )}
+                {conceptStep === "reference" && aiError && <p className="notice-error">{aiError}</p>}
               </>
             )}
 
             {!showResult && (
               <p className="border border-dashed border-rule-strong px-3 py-3 text-[13px] leading-relaxed text-ink-muted">
-                채점한 뒤에 기준 의미와 기본 점수, 맞춘·빠진 핵심어가 보이고 틀린 이유를 쓸 수 있어요.
+                채점한 뒤에 기준 의미와 점수, 맞은 점·빠진 점이 보이고 틀린 이유를 쓸 수 있어요.
               </p>
             )}
 

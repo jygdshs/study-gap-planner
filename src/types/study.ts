@@ -23,6 +23,11 @@ export interface StudyRecordInput {
   // 개념 의미 유형
   concept_reference?: string | null;
   concept_answer?: string | null;
+  // 007 마이그레이션: AI 정의·AI 채점 (concept_score가 비어 있으면 핵심어 일치도로 채점)
+  concept_name?: string | null;
+  reference_source?: "user" | "ai" | null;
+  concept_score?: number | null;
+  concept_feedback?: string | null;
 
   // 공통
   wrong_reasons: string[];

@@ -9,16 +9,22 @@ import { keywordScore, type KeywordScore } from "@/lib/keywords";
 import { buildQuizQueue, type QuizItem } from "@/lib/review";
 import { buildSubjectColorMap, colorOf } from "@/lib/palette";
 import KeywordMatches from "@/components/KeywordMatches";
+import ConceptGradeView from "@/components/ConceptGradeView";
+import { gradeConcept, type GradeResult } from "@/lib/conceptAi";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader, ScoreBar, SubjectChip } from "@/components/ui";
 
 // 개념 복습 퀴즈: 전에 입력한 개념 의미의 기준 의미를 가린 채 다시 설명하게 하고,
-// 핵심어 채점으로 채점한 뒤 기준 의미를 공개한다. 저장하면 새 학습 기록이 되어 점수·계획에 반영된다.
+// AI가 뜻이 맞는지 채점한 뒤 기준 의미를 공개한다 (AI가 안 되면 핵심어로 채점).
+// 저장하면 새 학습 기록이 되어 점수·계획에 반영된다.
 
 const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
 
 type Done = { key: string; score: number; before: number; saved: boolean };
+type QuizResult =
+  | { by: "ai"; score: number; grade: GradeResult }
+  | { by: "keyword"; score: number; keyword: KeywordScore };
 
 export default function QuizPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -29,7 +35,9 @@ export default function QuizPage() {
   const [queue, setQueue] = useState<QuizItem[]>([]);
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<KeywordScore | null>(null);
+  const [result, setResult] = useState<QuizResult | null>(null);
+  const [grading, setGrading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -66,16 +74,35 @@ export default function QuizPage() {
   const finished = queue.length > 0 && index >= queue.length;
   const keyOf = (q: QuizItem) => `${q.subjectId}::${q.unit}`;
 
-  const grade = () => {
+  const subjectNameOf = (id: string) => subjects.find((s) => s.id === id)?.name ?? "";
+
+  const grade = async () => {
     if (!current || !answer.trim()) return;
-    setResult(keywordScore(current.reference, answer));
+    setGrading(true);
+    setAiError(null);
     setMessage(null);
+    try {
+      const g = await gradeConcept(subjectNameOf(current.subjectId), current.unit, current.term, current.reference, answer);
+      setResult({ by: "ai", score: g.score, grade: g });
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI가 채점하지 못했어요.");
+    }
+    setGrading(false);
+  };
+
+  // AI가 안 될 때: 핵심어 일치도로 채점
+  const gradeByKeywords = () => {
+    if (!current || !answer.trim()) return;
+    const k = keywordScore(current.reference, answer);
+    setResult({ by: "keyword", score: k.score, keyword: k });
+    setAiError(null);
   };
 
   const next = () => {
     setIndex((i) => i + 1);
     setAnswer("");
     setResult(null);
+    setAiError(null);
     setReasons([]);
     setMessage(null);
   };
@@ -88,7 +115,7 @@ export default function QuizPage() {
   const saveAndNext = async () => {
     if (!current || !result) return;
     if (result.score < 100 && reasons.length === 0) {
-      setMessage("빠진 핵심어를 보고 틀린 이유를 1개 이상 적어 주세요.");
+      setMessage("빠진 점을 보고 틀린 이유를 1개 이상 적어 주세요.");
       return;
     }
     setSaving(true);
@@ -100,10 +127,18 @@ export default function QuizPage() {
       concept_reference: current.reference,
       concept_answer: answer.trim(),
       wrong_reasons: reasons,
+      // 007: 개념 이름과 AI 채점 결과 (핵심어 채점이면 점수는 비워 둔다)
+      concept_name: current.term,
+      concept_score: result.by === "ai" ? result.score : null,
+      concept_feedback: result.by === "ai" ? result.grade.feedback : null,
     });
     setSaving(false);
     if (error) {
-      setMessage(`저장 실패: ${error.message}`);
+      setMessage(
+        /concept_(name|score|feedback)/.test(error.message)
+          ? "AI 채점 결과를 저장할 칸이 없어요. Supabase SQL Editor에서 supabase/migrations/007_concept_ai_grading.sql을 실행해 주세요."
+          : `저장 실패: ${error.message}`
+      );
       return;
     }
     setDone((d) => [...d, { key: keyOf(current), score: result.score, before: current.lastScore, saved: true }]);
@@ -167,7 +202,7 @@ export default function QuizPage() {
                 </div>
                 <div className="flex flex-col gap-5 p-5">
                   <p className="text-[13px] text-ink-muted">
-                    지난 기록 {shortDate(current.lastDate)} · 핵심어 일치도{" "}
+                    지난 기록 {shortDate(current.lastDate)} · 지난 점수{" "}
                     <strong className="text-ink">{current.lastScore}</strong> · 지금까지 {current.attempts}번 기록
                   </p>
                   <label className="flex flex-col gap-2">
@@ -180,7 +215,7 @@ export default function QuizPage() {
                     <textarea
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
-                      readOnly={!!result}
+                      readOnly={!!result || grading}
                       rows={4}
                       autoFocus
                       placeholder="내가 이해한 대로 써 보세요."
@@ -189,13 +224,23 @@ export default function QuizPage() {
                   </label>
 
                   {!result ? (
-                    <div className="flex gap-2">
-                      <button type="button" onClick={grade} disabled={!answer.trim()} className="btn-primary">
-                        채점하기
-                      </button>
-                      <button type="button" onClick={skip} className="btn-quiet">
-                        건너뛰기
-                      </button>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button type="button" onClick={grade} disabled={!answer.trim() || grading} className="btn-primary">
+                          {grading ? "AI가 채점하는 중…" : "AI로 채점하기"}
+                        </button>
+                        <button type="button" onClick={skip} disabled={grading} className="btn-quiet">
+                          건너뛰기
+                        </button>
+                      </div>
+                      {aiError && (
+                        <div className="notice-error flex flex-col items-start gap-2">
+                          <span>{aiError}</span>
+                          <button type="button" onClick={gradeByKeywords} className="font-semibold underline">
+                            AI 없이 핵심어로 채점하기
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
@@ -208,21 +253,29 @@ export default function QuizPage() {
 
                       <div className="flex flex-col gap-2 border-y border-rule py-5">
                         <div className="flex items-baseline justify-between">
-                          <span className="text-[13px] font-semibold text-ink-soft">핵심어 일치도</span>
+                          <span className="text-[13px] font-semibold text-ink-soft">
+                            {result.by === "ai" ? "AI 채점" : "핵심어 일치도"}
+                          </span>
                           <span className="text-[26px] font-extrabold tracking-tight">
                             {result.score}
                             <Delta now={result.score} before={current.lastScore} />
                           </span>
                         </div>
                         <ScoreBar score={result.score} thick />
-                        <KeywordMatches matches={result.matches} />
+                        {result.by === "ai" ? (
+                          <div className="pt-2">
+                            <ConceptGradeView grade={result.grade} />
+                          </div>
+                        ) : (
+                          <KeywordMatches matches={result.keyword.matches} />
+                        )}
                       </div>
 
                       <div className="flex flex-col gap-2">
                         <span className="field-label">
                           틀린 이유{" "}
                           <span className="font-normal text-ink-muted">
-                            {result.score === 100 ? "다 맞췄다면 비워도 돼요" : "빠진 핵심어를 왜 놓쳤는지"}
+                            {result.score === 100 ? "다 맞췄다면 비워도 돼요" : "빠진 점·잘못 안 점을 왜 놓쳤는지"}
                           </span>
                         </span>
                         <WrongReasonsInput value={reasons} onChange={setReasons} />

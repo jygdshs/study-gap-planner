@@ -36,7 +36,6 @@ export interface AnalyzeRequest {
   pdf: string; // base64 (필요한 쪽만 잘라낸 PDF)
 }
 
-export const DAILY_LIMIT = 20; // 하루 분석 횟수 (무료 한도를 아끼기 위해)
 export const MAX_PDF_BASE64 = 4_000_000; // 서버 요청 크기 제한(4.5MB) 안쪽
 export const MAX_WRONG = 30;
 

@@ -158,7 +158,8 @@ export function buildQuizQueue(subjects: Subject[], records: StudyRecord[], toda
       subjectName: nameById.get(latest.subject_id) ?? "?",
       unit: latest.unit,
       reference: latest.concept_reference!.trim(),
-      term: extractKeywords(latest.concept_reference!)[0] ?? latest.unit,
+      // 개념 이름을 적어 둔 기록이면 그 이름, 아니면 기준 의미의 첫 핵심어
+      term: latest.concept_name?.trim() || (extractKeywords(latest.concept_reference!)[0] ?? latest.unit),
       lastScore,
       lastDate: latest.study_date,
       attempts: rs.length,

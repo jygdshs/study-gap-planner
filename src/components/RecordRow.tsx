@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { scoreOfRecord } from "@/lib/scoring";
+import { gradeConcept } from "@/lib/conceptAi";
 import WrongReasonsInput from "@/components/WrongReasonsInput";
 import UnitInput from "@/components/UnitInput";
 import type { StudyRecord } from "@/types/study";
@@ -71,6 +72,20 @@ export default function RecordRow({
     }
     setBusy(true);
     setError(null);
+    // AI가 채점한 개념 기록의 기준 의미·설명을 고쳤으면 AI로 다시 채점한다.
+    // AI가 안 되면 점수를 비워 핵심어 일치도로 채점되게 한다 (고치기 전 점수가 남지 않도록)
+    let aiPatch: { concept_score: number | null; concept_feedback: string | null } | Record<string, never> = {};
+    const conceptChanged =
+      !isProblem &&
+      (reference.trim() !== (record.concept_reference ?? "").trim() || answer.trim() !== (record.concept_answer ?? "").trim());
+    if (conceptChanged && record.concept_score != null) {
+      try {
+        const g = await gradeConcept("", unit.trim(), record.concept_name ?? "", reference.trim(), answer.trim());
+        aiPatch = { concept_score: g.score, concept_feedback: g.feedback };
+      } catch {
+        aiPatch = { concept_score: null, concept_feedback: null };
+      }
+    }
     const { error } = await supabase
       .from("study_records")
       .update({
@@ -79,7 +94,7 @@ export default function RecordRow({
         wrong_reasons: reasons,
         ...(isProblem
           ? { problems_total: Number(total), problems_correct: Number(correct), problems_wrong: Number(wrong) }
-          : { concept_reference: reference.trim(), concept_answer: answer.trim() }),
+          : { concept_reference: reference.trim(), concept_answer: answer.trim(), ...aiPatch }),
       })
       .eq("id", record.id);
     setBusy(false);
