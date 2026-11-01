@@ -14,6 +14,9 @@ const MODELS = [
   ...new Set([process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]),
 ];
 const RETRY_DELAY_MS = 3000;
+// 모델 한 번 시도의 최대 시간. 최악의 경우(첫 모델 2번 + 다음 두 모델) 45초 × 4 + 3초 = 183초로,
+// Vercel 함수 제한 시간(300초) 안에 끝나 화면이 오류 안내를 받을 수 있다. PDF 분석은 60초(최악 243초).
+const ATTEMPT_TIMEOUT_MS = 45_000;
 
 /** 잠깐 뒤 다시 하면 될 수 있는 오류: 서버 과부하·일시 오류, 연결 문제(상태 코드 없음) */
 const isTransient = (status?: number) => !status || status >= 500;
@@ -107,6 +110,7 @@ export async function askGemini<T>(options: {
   input: InteractionInput[];
   schema: Record<string, unknown>;
   label: string; // 서버 로그용 이름
+  attemptTimeoutMs?: number; // 모델 한 번 시도의 최대 시간 (기본 ATTEMPT_TIMEOUT_MS)
 }): Promise<{ value: T; model: string } | Response> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   let lastError: ReturnType<typeof readGeminiError> | null = null;
@@ -114,13 +118,18 @@ export async function askGemini<T>(options: {
   for (const [mi, model] of MODELS.entries()) {
     for (let attempt = 0; attempt < (mi === 0 ? 2 : 1); attempt++) {
       try {
-        const interaction = await ai.interactions.create({
-          model,
-          store: false,
-          system_instruction: options.system,
-          input: options.input,
-          response_format: { type: "text", mime_type: "application/json", schema: options.schema },
-        });
+        // SDK 자체 재시도는 끈다: 붐빌 때(503) SDK가 몰래 여러 번 기다리며 다시 보내 한 번에 몇 분씩 걸렸다.
+        // 재시도·모델 전환은 이 반복문이 하고, 한 번 시도는 attemptTimeoutMs 안에 끝나게 한다.
+        const interaction = await ai.interactions.create(
+          {
+            model,
+            store: false,
+            system_instruction: options.system,
+            input: options.input,
+            response_format: { type: "text", mime_type: "application/json", schema: options.schema },
+          },
+          { timeout_ms: options.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS, retries: { strategy: "none" } }
+        );
         try {
           return { value: JSON.parse(interaction.output_text ?? "") as T, model };
         } catch {

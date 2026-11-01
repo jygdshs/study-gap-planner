@@ -40,6 +40,9 @@ const SUGGEST_PROMPT = `너는 고등학생의 개념 공부를 돕는 도우미
 
 const clip = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
 
+// Vercel 함수 최대 실행 시간(초). AI가 붐벼 모델을 바꿔 가며 시도해도 이 안에 끝나게 한다
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const ctx = await startAiRequest(req);
   if (ctx instanceof Response) return ctx;

@@ -34,6 +34,9 @@ PDF의 문항 번호는 "009.", "09", "9)", "[9]", "문제 9"처럼 앞에 0이 
 
 note에는 학생이 알아야 할 점(못 찾은 번호, 글자가 깨진 쪽 등)을 한두 문장으로 쓴다. 문제가 없으면 빈 문자열.`;
 
+// Vercel 함수 최대 실행 시간(초). AI가 붐벼 모델을 바꿔 가며 시도해도 이 안에 끝나게 한다
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   // 1) 키·로그인·하루 사용 횟수
   const ctx = await startAiRequest(req);
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
     ],
     schema: ANALYSIS_SCHEMA,
     label: "analyze-problems",
+    attemptTimeoutMs: 60_000, // PDF는 읽는 데 더 오래 걸린다
   });
   if (result instanceof Response) return result;
   const parsed = result.value;
