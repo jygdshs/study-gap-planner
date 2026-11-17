@@ -101,5 +101,7 @@ export interface PlanItem {
   // 004 마이그레이션: 계획 vs 실제 공부 시간(분). 마이그레이션 전이면 필드 자체가 없다
   planned_minutes?: number | null;
   actual_minutes?: number | null;
+  // 010 마이그레이션: 그 칸에서 풀 문제집·쪽·문제 번호 같은 공부 내용 메모
+  note?: string | null;
   created_at: string;
 }

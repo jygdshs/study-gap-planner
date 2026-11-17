@@ -9,6 +9,7 @@ import PlanCell from "@/components/PlanCell";
 import PriorityList from "@/components/PriorityList";
 import Timetable from "@/components/Timetable";
 import TimeLogSection from "@/components/TimeLogSection";
+import PlanNotesSection from "@/components/PlanNotesSection";
 import DayTimeline from "@/components/DayTimeline";
 import { buildExportDays, downloadPlanIcs, downloadPlanImage, downloadPlanPdf } from "@/lib/exportPlan";
 import { ArrowRightIcon, CheckIcon, RefreshIcon } from "@/components/Icons";
@@ -331,6 +332,7 @@ export default function PlanPage() {
               </section>
             )}
 
+            {!planError && <PlanNotesSection data={data} />}
             {!planError && <TimeLogSection data={data} />}
           </div>
 

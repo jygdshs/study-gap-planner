@@ -47,6 +47,8 @@ export function usePlanData() {
   const [planError, setPlanError] = useState<string | null>(null);
   // 004 마이그레이션(planned_minutes, actual_minutes 열)을 실행했는지
   const [hasTimeColumns, setHasTimeColumns] = useState(false);
+  // 010 마이그레이션(note 열: 계획 칸 메모)을 실행했는지
+  const [hasNoteColumn, setHasNoteColumn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
@@ -85,6 +87,11 @@ export function usePlanData() {
           .select("planned_minutes, actual_minutes")
           .limit(1)
           .then(({ error }) => setHasTimeColumns(!error)),
+        supabase
+          .from("plan_items")
+          .select("note")
+          .limit(1)
+          .then(({ error }) => setHasNoteColumn(!error)),
         supabase
           .from("day_schedules")
           .select("*")
@@ -219,7 +226,12 @@ export function usePlanData() {
         .from("plan_items")
         .upsert(
           upserts.map((u) => {
-            const row = { ...u, user_id: user?.id };
+            let row: Record<string, unknown> = { ...u, user_id: user?.id };
+            // 칸의 과목·단원이 바뀌면 예전 메모는 맞지 않으니 지운다 (같으면 그대로 둔다)
+            if (hasNoteColumn) {
+              const prev = planItems.find((it) => it.plan_date === u.plan_date && it.slot === u.slot);
+              if (prev && (prev.subject_id !== u.subject_id || prev.unit !== u.unit)) row = { ...row, note: null };
+            }
             if (!hasTimeColumns) return row;
             const day = dayByDate.get(u.plan_date);
             return { ...row, planned_minutes: day ? minutesFor(day, true)[u.slot] : null };
@@ -304,9 +316,25 @@ export function usePlanData() {
     return true;
   };
 
+  /** 계획 칸 메모 저장. 빈 글이면 지운다 */
+  const setNote = async (item: PlanItem, text: string) => {
+    const note = text.trim() === "" ? null : text.trim().slice(0, 200);
+    setPlanItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, note } : it)));
+    const { error } = await supabase.from("plan_items").update({ note }).eq("id", item.id);
+    if (error) {
+      setPlanItems((prev) => prev.map((it) => (it.id === item.id ? item : it)));
+      setMessage({ type: "error", text: `메모 저장 실패: ${error.message}` });
+      return false;
+    }
+    return true;
+  };
+
   return {
     today,
     weakTypeOf,
+    hasNoteColumn,
+    setNote,
+    planItems,
     carried,
     hasTimeColumns,
     plannedMinutesOf,

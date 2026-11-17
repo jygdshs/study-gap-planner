@@ -33,10 +33,10 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
 
   // 칸에 마우스를 올리거나 키보드로 포커스하면 바로 뜨는 안내 (공부 시간이 짧아 칸 안에 시각이 안 들어가도 볼 수 있게)
   // 칸이 overflow-hidden이라 칸 안에 넣으면 잘리므로 화면 위에 고정 위치로 띄운다.
-  const [tip, setTip] = useState<{ x: number; y: number; time: string; minutes: number; text: string; note: string } | null>(null);
-  const showTip = (el: HTMLElement, time: string, minutes: number, text: string, note: string) => {
+  const [tip, setTip] = useState<{ x: number; y: number; time: string; minutes: number; text: string; note: string; memo?: string | null } | null>(null);
+  const showTip = (el: HTMLElement, time: string, minutes: number, text: string, note: string, memo?: string | null) => {
     const r = el.getBoundingClientRect();
-    setTip({ x: r.left + r.width / 2, y: r.top, time, minutes, text, note });
+    setTip({ x: r.left + r.width / 2, y: r.top, time, minutes, text, note, memo });
   };
   const hideTip = () => setTip(null);
 
@@ -269,9 +269,9 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         <button
           key={b.start}
           type="button"
-          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`)}
+          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`, cell.saved?.note)}
           onMouseLeave={hideTip}
-          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`)}
+          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`, cell.saved?.note)}
           onBlur={hideTip}
           aria-label={`${label} ${cell.completed ? "완료 취소" : "완료 체크"}`}
           aria-pressed={cell.completed}
@@ -284,9 +284,9 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
       ) : (
         <div
           key={b.start}
-          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요")}
+          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요", cell.saved?.note)}
           onMouseLeave={hideTip}
-          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요")}
+          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요", cell.saved?.note)}
           onBlur={hideTip}
           tabIndex={0}
           aria-label={label}
@@ -312,6 +312,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
             {tip.time} <span className="font-semibold opacity-80">· {tip.minutes}분</span>
           </span>
           <span className="block text-[12px] font-semibold">{tip.text}</span>
+          {tip.memo && <span className="mt-0.5 block text-[12px] font-bold underline decoration-dotted">{tip.memo}</span>}
           <span className="block text-[11px] opacity-70">{tip.note}</span>
         </div>,
         document.body

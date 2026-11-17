@@ -15,6 +15,7 @@ export interface ExportCell {
   saved: boolean;
   completed: boolean;
   carried: boolean;
+  note: string | null; // 공부 내용 메모(문제집, 쪽, 문제 번호)
   times: string | null; // 공부 시간대가 있으면 이 과목을 공부하는 시각 "19:00–19:35 · 19:55–20:30"
 }
 
@@ -56,6 +57,7 @@ export function buildExportDays(data: PlanData): ExportDay[] {
         saved: Boolean(saved),
         completed: Boolean(saved?.completed),
         carried: Boolean(rec?.carriedFrom && rec.subjectId === subjectId && rec.unit === unit),
+        note: saved?.note ?? null,
         times: timesOf(slot),
       };
     });
@@ -471,7 +473,7 @@ export function buildPlanIcs(days: ExportDay[]): string {
     day.cells.forEach((cell, slot) => {
       if (!cell) return;
       const title = `${cell.subjectName} ${cell.unit}${cell.completed ? " (완료)" : ""}`;
-      const desc = `${cell.minutes ? `${cell.minutes}분 · ` : ""}${cell.carried ? "못 한 공부 이월 · " : ""}학습 공백 분석 시스템 계획`;
+      const desc = `${cell.note ? `${cell.note} | ` : ""}${cell.minutes ? `${cell.minutes}분 · ` : ""}${cell.carried ? "못 한 공부 이월 · " : ""}학습 공백 분석 시스템 계획`;
       const parts = cell.times ? cell.times.split(" · ") : [];
       if (parts.length === 0) {
         event(`${day.date}-${slot}`, [

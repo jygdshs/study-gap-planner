@@ -132,6 +132,11 @@ export default function DayTimeline({
           return (
             <li key={b.start} className={`flex items-stretch gap-1.5 ${cell.completed ? "opacity-70" : ""}`}>
               <div className="min-w-0 flex-1">
+              {cell.saved?.note && (
+                <p className="mb-0.5 truncate px-1 text-[12px] font-semibold text-ink-soft" title={cell.saved.note}>
+                  {cell.saved.note}
+                </p>
+              )}
               {checkable ? (
                 <button
                   type="button"
