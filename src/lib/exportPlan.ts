@@ -410,3 +410,103 @@ export async function downloadPlanPdf(days: ExportDay[], title: string, subtitle
   }
   downloadBlob(buildPdf(pages), fileName);
 }
+// ---------------------------------------------------------------------------
+// 캘린더(.ics): 구글 캘린더·애플 캘린더·네이버 캘린더 등에서 가져오기(불러오기)로 열 수 있다.
+//  - 공부 시간대가 있는 날은 공부 조각마다 시각이 있는 일정, 없는 날은 하루 종일 일정
+//  - 시험은 하루 종일 일정. 시각은 '기기 현지 시간'(시간대 없음)으로 넣어 한국 시간 그대로 보인다.
+// ---------------------------------------------------------------------------
+
+const icsEscape = (t: string) =>
+  t.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+
+/** 한 줄이 75바이트를 넘지 않게 접는다(UTF-8 글자 단위). 접힌 줄은 공백으로 시작 */
+function icsFold(line: string): string {
+  const enc = new TextEncoder();
+  const out: string[] = [];
+  let cur = "";
+  let bytes = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > (out.length === 0 ? 74 : 73)) {
+      out.push(cur);
+      cur = "";
+      bytes = 0;
+    }
+    cur += ch;
+    bytes += n;
+  }
+  out.push(cur);
+  return out.join("\r\n ");
+}
+
+const compact = (iso: string) => iso.replace(/-/g, "");
+const nextDay = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+const hhmm = (t: string) => t.replace(":", "") + "00";
+
+export function buildPlanIcs(days: ExportDay[]): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//study-gap-planner//학습 계획//KO",
+    "CALSCALE:GREGORIAN",
+    "X-WR-CALNAME:학습 계획",
+  ];
+  const event = (uid: string, fields: string[]) => {
+    lines.push("BEGIN:VEVENT", `UID:${uid}@study-gap-planner`, `DTSTAMP:${stamp}`, ...fields, "END:VEVENT");
+  };
+
+  for (const day of days) {
+    for (const e of day.exams) {
+      event(`${day.date}-exam-${e.name}`, [
+        `DTSTART;VALUE=DATE:${compact(day.date)}`,
+        `DTEND;VALUE=DATE:${compact(nextDay(day.date))}`,
+        `SUMMARY:${icsEscape(`${e.name} 시험`)}`,
+      ]);
+    }
+    day.cells.forEach((cell, slot) => {
+      if (!cell) return;
+      const title = `${cell.subjectName} ${cell.unit}${cell.completed ? " (완료)" : ""}`;
+      const desc = `${cell.minutes ? `${cell.minutes}분 · ` : ""}${cell.carried ? "못 한 공부 이월 · " : ""}학습 공백 분석 시스템 계획`;
+      const parts = cell.times ? cell.times.split(" · ") : [];
+      if (parts.length === 0) {
+        event(`${day.date}-${slot}`, [
+          `DTSTART;VALUE=DATE:${compact(day.date)}`,
+          `DTEND;VALUE=DATE:${compact(nextDay(day.date))}`,
+          `SUMMARY:${icsEscape(title)}`,
+          `DESCRIPTION:${icsEscape(desc)}`,
+        ]);
+        return;
+      }
+      parts.forEach((range, i) => {
+        const [s, e] = range.split("–");
+        // 자정을 넘기는 공부는 끝 시각이 다음 날
+        const endDate = e <= s ? nextDay(day.date) : day.date;
+        event(`${day.date}-${slot}-${i}`, [
+          `DTSTART:${compact(day.date)}T${hhmm(s)}`,
+          `DTEND:${compact(endDate)}T${hhmm(e)}`,
+          `SUMMARY:${icsEscape(parts.length > 1 ? `${title} (${i + 1}/${parts.length})` : title)}`,
+          `DESCRIPTION:${icsEscape(desc)}`,
+        ]);
+      });
+    });
+  }
+  lines.push("END:VCALENDAR");
+  return lines.map(icsFold).join("\r\n") + "\r\n";
+}
+
+export function downloadPlanIcs(days: ExportDay[], fileName: string) {
+  const blob = new Blob([buildPlanIcs(days)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

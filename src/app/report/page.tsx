@@ -9,6 +9,7 @@ import { buildSubjectTrend, buildWeeklyReport, type UnitChange, type WeekStats }
 import { dailyStats, monthlyStats, sumActualMinutes, weeklyStats, type PeriodStat } from "@/lib/planTracking";
 import { formatMinutes } from "@/lib/allocation";
 import SubjectTrendChart from "@/components/SubjectTrendChart";
+import StudyCalendar from "@/components/StudyCalendar";
 import { buildSubjectColorMap, colorOf, scoreColor } from "@/lib/palette";
 import { ArrowRightIcon } from "@/components/Icons";
 import { ConfigNotice, ErrorNotice, LoadingSplit, PageFrame, PageHeader, SubjectChip } from "@/components/ui";
@@ -96,6 +97,11 @@ export default function ReportPage() {
       <ConfigNotice />
       {error && <ErrorNotice>데이터를 불러오지 못했어요. {error}</ErrorNotice>}
 
+      {!loading && !error && (
+        <div className="mb-6">
+          <StudyCalendar records={records} planItems={planItems} subjects={subjects} today={today} />
+        </div>
+      )}
       {loading ? (
         <LoadingSplit label="리포트를 만드는 중…" />
       ) : error ? null : thisWeek.records === 0 && lastWeek.records === 0 ? (

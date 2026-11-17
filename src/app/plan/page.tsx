@@ -10,7 +10,7 @@ import PriorityList from "@/components/PriorityList";
 import Timetable from "@/components/Timetable";
 import TimeLogSection from "@/components/TimeLogSection";
 import DayTimeline from "@/components/DayTimeline";
-import { buildExportDays, downloadPlanImage, downloadPlanPdf } from "@/lib/exportPlan";
+import { buildExportDays, downloadPlanIcs, downloadPlanImage, downloadPlanPdf } from "@/lib/exportPlan";
 import { ArrowRightIcon, CheckIcon, RefreshIcon } from "@/components/Icons";
 import {
   ConfigNotice,
@@ -51,7 +51,7 @@ export default function PlanPage() {
     noStudyHours,
     carried,
   } = data;
-  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+  const [exporting, setExporting] = useState<"png" | "pdf" | "ics" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [timelineDate, setTimelineDate] = useState<string | null>(null);
 
@@ -72,12 +72,13 @@ export default function PlanPage() {
   // 이행 기록 격자의 날짜 열: 6일 전 ~ 오늘
   const exportTitle = `학습 계획 ${weekRange}`;
   const exportSubtitle = `${periodNote} · ${shortDate(today)} 기준`;
-  const exportPlan = async (kind: "png" | "pdf") => {
+  const exportPlan = async (kind: "png" | "pdf" | "ics") => {
     setExporting(kind);
     setExportError(null);
     const fileName = `학습계획_${planDays[0].date}.${kind}`;
     try {
-      if (kind === "png") await downloadPlanImage(buildExportDays(data), exportTitle, exportSubtitle, fileName);
+      if (kind === "ics") downloadPlanIcs(buildExportDays(data), `학습계획_${planDays[0].date}.ics`);
+      else if (kind === "png") await downloadPlanImage(buildExportDays(data), exportTitle, exportSubtitle, fileName);
       else await downloadPlanPdf(buildExportDays(data), exportTitle, exportSubtitle, fileName);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "파일을 만들지 못했어요.");
@@ -228,6 +229,15 @@ export default function PlanPage() {
                 </button>
                 <button type="button" onClick={() => exportPlan("pdf")} disabled={exporting !== null} className="btn-quiet">
                   {exporting === "pdf" ? "만드는 중…" : "PDF로 저장"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportPlan("ics")}
+                  disabled={exporting !== null}
+                  className="btn-quiet"
+                  title="구글 캘린더 등에서 '가져오기'로 열 수 있는 .ics 파일"
+                >
+                  캘린더로 저장 (.ics)
                 </button>
               </div>
               {exportError && <p className="notice-error mx-5 mb-5">{exportError}</p>}
