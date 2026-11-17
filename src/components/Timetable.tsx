@@ -239,7 +239,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
             <span
               className={`min-w-0 break-keep text-[12px] font-bold lg:text-[13px] ${height >= 34 ? "line-clamp-2" : "truncate"}`}
             >
-              {cell.unit}
+              {cell.name} {cell.unit}
               {partTag}
             </span>
           </span>
@@ -247,19 +247,20 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         </>
       ) : (
         <>
-          <span className="block text-[11px] font-semibold leading-tight tabular-nums opacity-90 lg:text-[12px]">
-            {height >= 60 ? time : formatClock(b.start)}
-          </span>
+          {height >= 62 && (
+            <span className="block text-[11px] font-semibold leading-tight tabular-nums opacity-90 lg:text-[12px]">
+              {height >= 75 ? time : formatClock(b.start)}
+            </span>
+          )}
           <span
             className={`block break-keep text-[12px] font-bold leading-tight lg:text-[13px] ${
-              height >= 62 ? "line-clamp-2" : "truncate"
+              height >= 50 ? "line-clamp-2" : "truncate"
             } ${cell.completed ? "line-through" : ""}`}
           >
-            {height >= 80 ? cell.name + " " : ""}
-            {cell.unit}
+            {cell.name} {cell.unit}
             {partTag}
           </span>
-          {cell.carriedFrom && height >= 80 && <span className="block text-[10px] font-bold">이월</span>}
+          {cell.carriedFrom && height >= 90 && <span className="block text-[10px] font-bold">이월</span>}
           {cell.completed && <CheckIcon className="absolute right-1 top-1 h-3.5 w-3.5" aria-hidden />}
         </>
       );
