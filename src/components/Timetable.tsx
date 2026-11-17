@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import PlanCell from "@/components/PlanCell";
 import DayTimeline from "@/components/DayTimeline";
 import { CheckIcon } from "@/components/Icons";
@@ -29,6 +30,15 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
   const { today, savedAt, colors, subjectNameById, toggleItem, isRestDay, minutesFor } = data;
   const planDays = days ?? data.planDays.slice(0, 7);
   const maxHours = Math.max(1, ...data.planDays.map((d) => d.availableHours));
+
+  // 칸에 마우스를 올리거나 키보드로 포커스하면 바로 뜨는 안내 (공부 시간이 짧아 칸 안에 시각이 안 들어가도 볼 수 있게)
+  // 칸이 overflow-hidden이라 칸 안에 넣으면 잘리므로 화면 위에 고정 위치로 띄운다.
+  const [tip, setTip] = useState<{ x: number; y: number; time: string; minutes: number; text: string; note: string } | null>(null);
+  const showTip = (el: HTMLElement, time: string, minutes: number, text: string, note: string) => {
+    const r = el.getBoundingClientRect();
+    setTip({ x: r.left + r.width / 2, y: r.top, time, minutes, text, note });
+  };
+  const hideTip = () => setTip(null);
 
   // 처음 그려진 직후 한 프레임 뒤에 true → 그 뒤 새로 생긴 칸은 시간차 없이 채워진다
   const settled = useRef(false);
@@ -222,6 +232,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
             {b.part}/{b.parts}
           </span>
         ) : null;
+      const partText = (b.parts ?? 1) > 1 ? ` (${b.part}/${b.parts})` : "";
       const body = compact ? (
         <>
           <span className={`flex items-baseline gap-1 leading-tight ${cell.completed ? "line-through" : ""}`}>
@@ -257,7 +268,10 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         <button
           key={b.start}
           type="button"
-          title={`${label} — 눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`}
+          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`)}
+          onMouseLeave={hideTip}
+          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, `눌러서 ${cell.completed ? "체크 취소" : "완료 체크"}`)}
+          onBlur={hideTip}
           aria-label={`${label} ${cell.completed ? "완료 취소" : "완료 체크"}`}
           aria-pressed={cell.completed}
           onClick={() => toggleItem(cell.saved!)}
@@ -269,7 +283,12 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
       ) : (
         <div
           key={b.start}
-          title={cell.saved ? `${label} (그날이 되면 체크할 수 있어요)` : `${label} — 저장하면 체크할 수 있어요`}
+          onMouseEnter={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요")}
+          onMouseLeave={hideTip}
+          onFocus={(e) => showTip(e.currentTarget, time, b.end - b.start, `${cell.name} ${cell.unit}${partText}`, cell.saved ? "그날이 되면 체크할 수 있어요" : "추천 · 저장하면 체크할 수 있어요")}
+          onBlur={hideTip}
+          tabIndex={0}
+          aria-label={label}
           className={`${base} ${cell.saved ? "" : "border border-dashed"}`}
           style={{ ...style, ...motion, top, height }}
         >
@@ -281,6 +300,21 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
 
   return (
     <>
+      {tip &&
+        createPortal(
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-50 max-w-[260px] -translate-x-1/2 -translate-y-full border border-rule-strong bg-ink px-2.5 py-1.5 text-center text-sheet shadow-lg"
+          style={{ left: Math.min(Math.max(tip.x, 140), window.innerWidth - 140), top: tip.y - 6 }}
+        >
+          <span className="block text-[14px] font-extrabold tabular-nums">
+            {tip.time} <span className="font-semibold opacity-80">· {tip.minutes}분</span>
+          </span>
+          <span className="block text-[12px] font-semibold">{tip.text}</span>
+          <span className="block text-[11px] opacity-70">{tip.note}</span>
+        </div>,
+        document.body
+        )}
       {!axis && planDays.some((d) => !isRestDay(d)) && (
         <p className="mx-5 mt-5 text-[13px] text-ink-soft">
           공부 시간대를 정하면 시간표가 몇 시부터 몇 시까지 공부하고 쉬는지로 바뀌어요.{" "}
