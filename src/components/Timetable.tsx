@@ -146,7 +146,7 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
     if (!isFinite(first) || !isFinite(last)) return null;
     const start = Math.floor(first / 60) * 60;
     const end = Math.max(start + 60, Math.ceil(last / 60) * 60);
-    const ppm = Math.min(2, Math.max(1, 600 / (end - start)));
+    const ppm = Math.min(2, Math.max(1.3, 600 / (end - start)));
     const hours = Array.from({ length: (end - start) / 60 + 1 }, (_, i) => start / 60 + i);
     return { start, end, ppm, height: (end - start) * ppm, hours };
   })();
@@ -213,29 +213,46 @@ export default function Timetable({ data, days }: { data: PlanData; days?: PlanD
         : { backgroundColor: "rgb(var(--c-sheet))", color: ink, borderColor: ink }; // 추천 칸: 점선 테두리
       const weak = data.weakTypeOf(cell.subjectId, cell.unit);
       const label = `${time} ${cell.name} ${cell.unit}${weak ? ` (${weak.type} 위주)` : ""}${cell.saved ? (cell.completed ? " 완료" : "") : " 추천"}`;
-      const body = (
+      // 낮은 칸(약 40px 미만)은 단원명만 한 줄로 보여 글씨가 잘리지 않게 하고(시각은 왼쪽 축과 툴팁에 있음),
+      // 충분히 높은 칸은 긴 단원명을 두 줄까지 보여 준다
+      const compact = height < 40;
+      const partTag =
+        (b.parts ?? 1) > 1 ? (
+          <span className="ml-1 text-[10px] font-semibold opacity-80 lg:text-[11px]">
+            {b.part}/{b.parts}
+          </span>
+        ) : null;
+      const body = compact ? (
+        <>
+          <span className={`flex items-baseline gap-1 leading-tight ${cell.completed ? "line-through" : ""}`}>
+            <span
+              className={`min-w-0 break-keep text-[12px] font-bold lg:text-[13px] ${height >= 34 ? "line-clamp-2" : "truncate"}`}
+            >
+              {cell.unit}
+              {partTag}
+            </span>
+          </span>
+          {cell.completed && <CheckIcon className="absolute right-1 top-0.5 h-3.5 w-3.5" aria-hidden />}
+        </>
+      ) : (
         <>
           <span className="block text-[11px] font-semibold leading-tight tabular-nums opacity-90 lg:text-[12px]">
-            {height >= 40 ? time : formatClock(b.start)}
+            {height >= 60 ? time : formatClock(b.start)}
           </span>
           <span
-            className={`block truncate text-[12px] font-bold leading-tight lg:text-[13px] ${cell.completed ? "line-through" : ""}`}
+            className={`block break-keep text-[12px] font-bold leading-tight lg:text-[13px] ${
+              height >= 62 ? "line-clamp-2" : "truncate"
+            } ${cell.completed ? "line-through" : ""}`}
           >
-            {height >= 58 ? cell.name + " " : ""}
+            {height >= 80 ? cell.name + " " : ""}
             {cell.unit}
-            {(b.parts ?? 1) > 1 && (
-              <span className="ml-1 text-[10px] font-semibold opacity-80 lg:text-[11px]">
-                {b.part}/{b.parts}
-              </span>
-            )}
+            {partTag}
           </span>
-          {cell.carriedFrom && height >= 58 && <span className="block text-[10px] font-bold">이월</span>}
-          {cell.completed && (
-            <CheckIcon className="absolute right-1 top-1 h-3.5 w-3.5" aria-hidden />
-          )}
+          {cell.carriedFrom && height >= 80 && <span className="block text-[10px] font-bold">이월</span>}
+          {cell.completed && <CheckIcon className="absolute right-1 top-1 h-3.5 w-3.5" aria-hidden />}
         </>
       );
-      const base = "cell-fill absolute inset-x-1 overflow-hidden px-1.5 py-1 text-left";
+      const base = `cell-fill absolute inset-x-1 overflow-hidden px-1.5 text-left ${compact ? "py-0.5" : "py-1"}`;
       return checkable ? (
         <button
           key={b.start}
