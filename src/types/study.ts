@@ -6,6 +6,8 @@ export interface Subject {
   id: string;
   name: string;
   exam_date: string | null; // YYYY-MM-DD
+  // 009 마이그레이션: 시험 범위 단원. 비었거나 없으면 그 과목의 모든 단원이 범위
+  exam_units?: string[] | null;
   created_at: string;
 }
 

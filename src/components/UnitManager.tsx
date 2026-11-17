@@ -67,6 +67,12 @@ export default function UnitManager({ subjects }: { subjects: Subject[] }) {
       return;
     }
     setBusy(true);
+    // 시험 범위에 들어 있던 이름도 같이 바꾼다 (009 마이그레이션 전이면 열이 없어 건너뜀)
+    const subject = subjects.find((s) => s.id === row.subjectId);
+    if (subject?.exam_units?.includes(row.unit)) {
+      const nextScope = [...new Set(subject.exam_units.map((u) => (u === row.unit ? next : u)))];
+      await supabase.from("subjects").update({ exam_units: nextScope }).eq("id", row.subjectId);
+    }
     const [recs, plans] = await Promise.all([
       supabase.from("study_records").update({ unit: next }).eq("subject_id", row.subjectId).eq("unit", row.unit),
       supabase.from("plan_items").update({ unit: next }).eq("subject_id", row.subjectId).eq("unit", row.unit),

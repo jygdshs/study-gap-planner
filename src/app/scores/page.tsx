@@ -276,7 +276,15 @@ function SelectedUnitPanel({
   onChanged: () => Promise<void>;
 }) {
   const steps = [
-    { label: unit.metricLabel, value: unit.metricValue, kind: "base" as const },
+    {
+      label: unit.metricLabel,
+      value: unit.metricValue,
+      kind: "base" as const,
+      note:
+        unit.blendedCount > 1
+          ? `최근 ${unit.blendedCount}회 가중 평균 (가장 최근 기록 하나만 보면 ${unit.latestMetricValue})`
+          : "기록이 1개라 그 기록 그대로",
+    },
     {
       label: "최근 학습 감점",
       value: -unit.recencyPenalty,

@@ -25,6 +25,10 @@ const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}.${Number(iso.slic
 export default function ExamsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [dates, setDates] = useState<Record<string, string>>({});
+  // 시험 범위: 과목별로 고른 단원 (빈 목록 = 전체 범위). 009 마이그레이션 전이면 hasScope=false
+  const [scopes, setScopes] = useState<Record<string, string[]>>({});
+  const [unitsBySubject, setUnitsBySubject] = useState<Record<string, string[]>>({});
+  const [hasScope, setHasScope] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,6 +52,16 @@ export default function ExamsPage() {
       const list = (data as Subject[]) ?? [];
       setSubjects(list);
       setDates(Object.fromEntries(list.map((s) => [s.id, s.exam_date ?? ""])));
+      setHasScope(list.length === 0 || "exam_units" in list[0]);
+      setScopes(Object.fromEntries(list.map((s) => [s.id, s.exam_units ?? []])));
+      // 범위로 고를 수 있는 단원 = 학습 기록이 있는 단원
+      const { data: recs } = await supabase.from("study_records").select("subject_id, unit");
+      const map: Record<string, string[]> = {};
+      for (const r of (recs as { subject_id: string; unit: string }[]) ?? []) {
+        (map[r.subject_id] ??= []).includes(r.unit) || map[r.subject_id].push(r.unit);
+      }
+      for (const k of Object.keys(map)) map[k].sort((a, b) => a.localeCompare(b, "ko"));
+      setUnitsBySubject(map);
     }
     setLoading(false);
   };
@@ -58,7 +72,9 @@ export default function ExamsPage() {
   }, []);
 
   const colors = buildSubjectColorMap(subjects);
-  const changed = subjects.filter((s) => (s.exam_date ?? "") !== (dates[s.id] ?? ""));
+  const sameScope = (a: string[], b: string[]) => a.length === b.length && a.every((u) => b.includes(u));
+  const scopeChanged = (s: Subject) => hasScope && !sameScope(s.exam_units ?? [], scopes[s.id] ?? []);
+  const changed = subjects.filter((s) => (s.exam_date ?? "") !== (dates[s.id] ?? "") || scopeChanged(s));
 
   // 입력 중인 날짜로 미리 계산한 계획 기간
   const draftSubjects = subjects.map((s) => ({ ...s, exam_date: dates[s.id] || null }));
@@ -71,7 +87,11 @@ export default function ExamsPage() {
     for (const s of changed) {
       const { error } = await supabase
         .from("subjects")
-        .update({ exam_date: dates[s.id] || null })
+        .update(
+          hasScope
+            ? { exam_date: dates[s.id] || null, exam_units: scopes[s.id]?.length ? scopes[s.id] : null }
+            : { exam_date: dates[s.id] || null }
+        )
         .eq("id", s.id);
       if (error) {
         setSaving(false);
@@ -181,7 +201,9 @@ export default function ExamsPage() {
               <h2 id="exam-list-title" className="sheet-title">
                 과목별 시험 날짜
               </h2>
-              <span className="text-xs text-ink-muted">비우면 시험 없음</span>
+              <span className="text-xs text-ink-muted">
+                {hasScope ? "날짜를 비우면 시험 없음" : "비우면 시험 없음 · 시험 범위는 009 마이그레이션 후 사용"}
+              </span>
             </div>
 
             {subjects.length === 0 ? (
@@ -246,6 +268,54 @@ export default function ExamsPage() {
                           `D-${dday}`
                         )}
                       </span>
+
+                      {hasScope && (unitsBySubject[s.id]?.length ?? 0) > 0 && (
+                        <div className="col-span-full flex flex-col gap-1.5 pb-1">
+                          <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                            <span className="font-semibold text-ink-soft">시험 범위</span>
+                            <span className="text-ink-muted">
+                              {(scopes[s.id]?.length ?? 0) === 0
+                                ? "전체 단원 (눌러서 범위만 고르기)"
+                                : `${scopes[s.id].length}/${unitsBySubject[s.id].length}개 단원만 계획에 넣어요`}
+                            </span>
+                            {(scopes[s.id]?.length ?? 0) > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setScopes((prev) => ({ ...prev, [s.id]: [] }))}
+                                className="font-semibold text-accent hover:underline"
+                              >
+                                전체로 되돌리기
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {unitsBySubject[s.id].map((u) => {
+                              const on = scopes[s.id]?.includes(u) ?? false;
+                              return (
+                                <button
+                                  key={u}
+                                  type="button"
+                                  aria-pressed={on}
+                                  onClick={() => {
+                                    setMessage(null);
+                                    setScopes((prev) => {
+                                      const cur = prev[s.id] ?? [];
+                                      return { ...prev, [s.id]: on ? cur.filter((x) => x !== u) : [...cur, u] };
+                                    });
+                                  }}
+                                  className={`border px-2 py-0.5 text-[13px] font-semibold ${
+                                    on
+                                      ? "border-ink bg-ink text-sheet"
+                                      : "border-rule-strong text-ink-soft hover:border-ink hover:text-ink"
+                                  }`}
+                                >
+                                  {u}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {editingId === s.id && (
                         <div className="col-span-full mt-2 flex flex-col gap-2 border border-rule bg-sheet-alt p-3">
@@ -361,7 +431,7 @@ export default function ExamsPage() {
                 {saving
                   ? "저장 중…"
                   : changed.length === 0
-                    ? "바뀐 날짜 없음"
+                    ? "바뀐 내용 없음"
                     : `시험 일정 저장하기 (${changed.length}과목)`}
               </button>
             </div>

@@ -11,7 +11,7 @@
 //  3) 계획 갱신 시, 이미 완료한 칸은 기록으로 남기고 나머지 칸만 새 추천으로 바꾼다.
 
 import type { PlanItem, StudyRecord, Subject } from "@/types/study";
-import { addDaysISO, dayOfWeekMonFirst, type PlanDay } from "@/lib/scoring";
+import { addDaysISO, dayOfWeekMonFirst, inExamScope, type PlanDay } from "@/lib/scoring";
 
 export interface AdherenceSummary {
   total: number; // 오늘까지 저장된 계획 칸 수
@@ -156,7 +156,8 @@ export function carryOverMissed(
   scoreOf: (subjectId: string, unit: string) => number
 ): { days: PlanDay[]; carried: CarriedItem[] } {
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const queue = missed.filter((m) => subjectById.has(m.subject_id));
+  // 시험 범위를 정한 과목은 범위 밖 단원을 옮기지 않는다
+  const queue = missed.filter((m) => subjectById.has(m.subject_id) && inExamScope(subjectById.get(m.subject_id), m.unit));
   const carried: CarriedItem[] = [];
 
   const days = planDays.map((day) => {

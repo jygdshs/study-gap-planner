@@ -10,6 +10,7 @@
 //       (최근에 공부했는데도 점수가 비슷하게 낮다는 건 아직 안 익숙하다는 뜻으로 보고
 //        한 번 더 복습하도록 우선순위를 올리기 위함)
 //    → 점수가 이미 확연히 다른 단원끼리는 이 두 보정이 적용되지 않는다(순수 동점자 처리이기 때문).
+//  - 기본 점수는 최근 기록 최대 3개의 가중 평균(0.5/0.3/0.2)이라 한 번의 결과로 크게 흔들리지 않는다
 //  - 과목별 시험 날짜가 가까울수록 그 과목 단원들의 점수를 낮춘다(동점 여부와 무관하게 항상 적용)
 //
 // 학습 점수는 0~100점이며, "점수가 낮을수록 우선적으로 학습해야 하는 단원/과목"이다.
@@ -121,13 +122,34 @@ export interface UnitStatus {
   latestRecord: StudyRecord;
   finalScore: number; // 0~100, 낮을수록 우선 학습 대상
   metricLabel: string;
-  metricValue: number;
+  metricValue: number; // 최근 기록 여러 개를 가중 평균한 값 (blendedCount개)
+  blendedCount: number; // 점수에 반영된 최근 기록 수 (1~3)
+  latestMetricValue: number; // 가장 최근 기록 하나만의 값
   tiedWithOthers: boolean; // 다른 단원과 점수(metricValue)가 비슷해 동점자 처리가 적용됐는지
   recencyPenalty: number;
   volumePenalty: number;
   examPenalty: number;
   history: { date: string; score: number }[]; // 그래프용 (오래된 순)
   wrongReasonsHistory: { date: string; reasons: string[] }[];
+}
+
+// 단원 점수는 가장 최근 기록 하나가 아니라 최근 여러 기록을 가중 평균해서 정한다.
+// 한 번 운 좋게(또는 나쁘게) 푼 결과 때문에 점수가 크게 출렁이지 않게 하기 위해서다.
+//  - 최근 SMOOTH_WEIGHTS.length 개 기록만 쓴다. 가장 최근이 가장 무겁다(0.5 / 0.3 / 0.2).
+//  - 기록이 2개뿐이면 그 두 개의 가중치만 남겨 합이 1이 되게 다시 맞춘다. 1개면 그 기록 그대로.
+export const SMOOTH_WEIGHTS = [0.5, 0.3, 0.2];
+
+function blendedScore(sortedOldestFirst: StudyRecord[]): RecordScore & { blendedCount: number } {
+  const recent = sortedOldestFirst.slice(-SMOOTH_WEIGHTS.length).reverse(); // 최신 → 과거
+  const scored = recent.map(scoreOfRecord);
+  const weights = SMOOTH_WEIGHTS.slice(0, scored.length);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const value = scored.reduce((acc, sc, i) => acc + sc.metricValue * weights[i], 0) / sum;
+  return {
+    ...scored[0], // 라벨·기록은 가장 최근 것
+    metricValue: Math.round(value * 10) / 10,
+    blendedCount: scored.length,
+  };
 }
 
 // 이 이내로 점수(metricValue) 차이가 나면 "비슷하다"고 보고 동점자 처리를 적용한다.
@@ -180,7 +202,7 @@ export function buildUnitStatuses(
     unit: string;
     sorted: StudyRecord[];
     latest: StudyRecord;
-    baseScore: RecordScore;
+    baseScore: RecordScore & { blendedCount: number };
   }
 
   const prepared: Prepared[] = [];
@@ -195,7 +217,7 @@ export function buildUnitStatuses(
       return a.created_at < b.created_at ? -1 : 1;
     });
     const latest = sorted[sorted.length - 1];
-    prepared.push({ subjectId, subject, unit, sorted, latest, baseScore: scoreOfRecord(latest) });
+    prepared.push({ subjectId, subject, unit, sorted, latest, baseScore: blendedScore(sorted) });
   }
 
   // 2단계: 다른 단원과 기본 점수가 TIE_SCORE_THRESHOLD 이내로 비슷한 단원에만
@@ -231,6 +253,8 @@ export function buildUnitStatuses(
       finalScore,
       metricLabel: p.baseScore.metricLabel,
       metricValue: p.baseScore.metricValue,
+      blendedCount: p.baseScore.blendedCount,
+      latestMetricValue: scoreOfRecord(p.latest).metricValue,
       tiedWithOthers: tied,
       recencyPenalty: Math.round(rPenalty * 10) / 10,
       volumePenalty: Math.round(vPenalty * 10) / 10,
@@ -308,6 +332,12 @@ function isStudyableOn(subject: Subject, dateISO: string): boolean {
   return !subject.exam_date || subject.exam_date > dateISO;
 }
 
+/** 시험 범위 안의 단원인지: 범위를 정하지 않은 과목은 모든 단원이 범위 */
+export function inExamScope(subject: Subject | undefined, unit: string): boolean {
+  const scope = subject?.exam_units;
+  return !scope || scope.length === 0 || scope.includes(unit);
+}
+
 // ---------------------------------------------------------------------------
 // 날짜별 개인 학습 계획
 // ---------------------------------------------------------------------------
@@ -364,7 +394,10 @@ export function buildStudyPlan(
     const items: PlanDay["items"] = [];
     if (availableHours > 0) {
       const studyable = subjects.filter((s) => isStudyableOn(s, date));
-      const units = buildUnitStatuses(studyable, records, date);
+      // 시험 범위를 정한 과목은 그 범위 단원만 계획에 넣는다
+      const units = buildUnitStatuses(studyable, records, date).filter((u) =>
+        inExamScope(studyable.find((s) => s.id === u.subjectId), u.unit)
+      );
 
       for (let slot = 0; slot < 2; slot++) {
         let best: UnitStatus | null = null;
